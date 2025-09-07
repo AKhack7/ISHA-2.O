@@ -55,7 +55,13 @@ class IshaAssistant:
         
         # Initialize speech recognition
         self.recognizer = sr.Recognizer()
-        self.microphone = sr.Microphone()
+        self.microphone = None
+        try:
+            self.microphone = sr.Microphone()
+        except (AttributeError, OSError) as e:
+            logging.error(f"Microphone initialization failed: {str(e)}")
+            self.chat_box_insert("Output: Voice recognition disabled. PyAudio not found or microphone issue. Please install PyAudio and check microphone.\n")
+        
         self.is_listening = False
         
         # Internet check caching
@@ -97,6 +103,36 @@ class IshaAssistant:
             "updated & security": ("ms-settings:windowsupdate", "0087")
         }
 
+        self.SETTING_MAP4s = {
+            "01": ("ms-settings:display"),
+            "03": ("ms-settings:sound"),
+            "07": ("ms-settings:notifications"),
+            "08": ("ms-settings:quiethours"),
+            "04": ("ms-settings:powersleep"),
+            "05": ("ms-settings:storagesense"),
+            "03": ("ms-settings:tablet"),
+            "088": ("ms-settings:multitasking"),
+            "099": ("ms-settings:project"),
+            "076": ("ms-settings:crossdevice"),
+            "098": ("ms-settings:appsfeatures-app"),
+            "054": ("ms-settings:clipboard"),
+            "00": ("ms-settings:remotedesktop"),
+            "021": ("ms-settings:optionalfeatures",),
+            "007": ("ms-settings:about"),
+            "0022": ("ms-settings:system"),
+            "0033": ("ms-settings:devices"),
+            "0044": ("ms-settings:mobile-devices"),
+            "0055": ("ms-settings:network"),
+            "0066": ("ms-settings:personalization"),
+            "0099": ("ms-settings:appsfeatures"),
+            "0088": ("ms-settings:yourinfo"),
+            "0010": ("ms-settings:dateandtime"),
+            "0009": ("ms-settings:gaming"),
+            "0080": ("ms-settings:easeofaccess"),
+            "0076": ("ms-settings:privacy"),
+            "0087": ("ms-settings:windowsupdate")
+        }
+
         self.apps_commands = {
             "alarms & clock": "ms-clock:",
             "calculator": "calc",
@@ -108,7 +144,7 @@ class IshaAssistant:
             "groove music": "mswindowsmusic:",
             "mail": "outlookmail:",
             "maps": "bingmaps:",
-            "microsoft edge": "msedge:",
+            "microsoft edge": "msedge",
             "microsoft solitaire collection": "ms-solitaire:",
             "microsoft store": "ms-windows-store:",
             "mixed reality portal": "ms-mixedreality:",
@@ -118,7 +154,7 @@ class IshaAssistant:
             "onenote": "ms-onenote:",
             "outlook": "outlookmail:",
             "outlook (classic)": "ms-outlook:",
-            "paint": "mspaint:",
+            "paint": "mspaint",
             "paint 3d": "ms-paint:",
             "phone link": "ms-phonelink:",
             "power point": "ms-powerpoint:",
@@ -136,32 +172,72 @@ class IshaAssistant:
             "about your pc": "ms-settings:about"
         }
 
+        self.apps_commands4q = {
+            "a1": "ms-clock:",
+            "c1": "calc",
+            "c2": "outlookcal:",
+            "c3": "microsoft.windows.camera:",
+            "c4": "ms-copilot:",
+            "c5": "ms-cortana:",
+            "gb1": "ms-gamebar:",
+            "gm1": "mswindowsmusic:",
+            "m1": "outlookmail:",
+            "ms1": "bingmaps:",
+            "me1": "msedge",
+            "mc1": "ms-solitaire:",
+            "ms1": "ms-windows-store:",
+            "mp1": "ms-mixedreality:",
+            "mt1": "mswindowsvideo:",
+            "o1": "ms-office:",
+            "oe": "ms-onedrive:",
+            "oe": "ms-onenote:",
+            "ouk": "outlookmail:",
+            "oc1": "ms-outlook:",
+            "p1": "mspaint",
+            "p3d": "ms-paint:",
+            "pk": "ms-phonelink:",
+            "pt": "ms-powerpoint:",
+            "ss": "ms-settings:",
+            "sk1": "skype:",
+            "s0h": "ms-snip:",
+            "s1e": "ms-stickynotes:",
+            "ts0": "ms-tips:",
+            "vr0": "ms-soundrecorder:",
+            "weather": "msnweather:",
+            "windows backup": "ms-settings:backup",
+            "windows security": "ms-settings:windowsdefender",
+            "word": "ms-word:",
+            "xbox": "ms-xbox:",
+            "about your pc": "ms-settings:about"
+        }
+
         self.software_dict = {
             "notepad": "notepad",
-            "ms word": "start winword",
+            "ms word": "winword",
             "command prompt": "cmd",
-            "excel": "start excel",
+            "excel": "excel",
             "vscode": "code",
-            "word16": "start winword",
+            "word16": "winword",
             "file explorer": "explorer",
-            "edge": "start msedge",
+            "edge": "msedge",
             "microsoft 365 copilot": "ms-copilot:",
-            "outlook": "start outlook",
-            "microsoft store": "start ms-windows-store:",
-            "photos": "start microsoft.photos:",
-            "xbox": "start xbox:",
-            "solitaire": "start microsoft.microsoftsolitairecollection:",
-            "clipchamp": "start clipchamp",
-            "to do": "start microsoft.todos:",
-            "linkedin": "start https://www.linkedin.com",
+            "outlook": "outlook",
+            "microsoft store": "ms-windows-store:",
+            "photos": "microsoft.photos:",
+            "xbox": "xbox:",
+            "solitaire": "microsoft.microsoftsolitairecollection:",
+            "clipchamp": "clipchamp",
+            "to do": "microsoft.todos:",
+            "linkedin": "https://www.linkedin.com",
             "calculator": "calc",
-            "news": "start bingnews:",
-            "one drive": "start onedrive",
-            "onenote 2016": "start onenote"
+            "news": "bingnews:",
+            "one drive": "onedrive",
+            "onenote 2016": "onenote",
+            "google": "https://www.google.com"
         }
 
         # Merge commands_dict with priority to apps_commands to avoid conflicts
-        self.commands_dict = {**self.SETTING_MAP, **self.software_dict, **self.apps_commands}
+        self.commands_dict = {**self.SETTING_MAP, **self.SETTING_MAP4s, **self.software_dict, **self.apps_commands, **self.apps_commands4q}
         self.commands_dict = {k: v if isinstance(v, str) else v[0] for k, v in self.commands_dict.items()}
         
         self.settings_list = [f"{name} ({code})" for name, (_, code) in self.SETTING_MAP.items()]
@@ -240,6 +316,10 @@ class IshaAssistant:
 
     def toggle_voice(self):
         """Toggle voice input on or off."""
+        if self.microphone is None:
+            self.speak("Voice recognition is disabled due to missing dependencies or hardware. Use text input instead.")
+            self.chat_box_insert("Output: Voice recognition disabled. Please use text input.\n")
+            return
         self.is_listening = not self.is_listening
         if self.is_listening:
             self.voice_button.configure(style='Voice.On.TButton')
@@ -262,23 +342,33 @@ class IshaAssistant:
         self.chat_box_insert(f"Output: {greeting}\n")
 
     def listen(self):
-        """Listen for voice input and return transcribed text."""
-        with self.microphone as source:
-            self.recognizer.adjust_for_ambient_noise(source, duration=1)
-            for _ in range(3):
-                try:
-                    audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
-                    return self.recognizer.recognize_google(audio).lower()
-                except sr.WaitTimeoutError:
-                    self.speak("No speech detected, please try again")
-                    continue
-                except sr.UnknownValueError:
-                    self.speak("Could not understand audio, please try again")
-                    continue
-                except sr.RequestError as e:
-                    self.speak(f"Speech recognition error: {str(e)}")
-                    return None
+        """Listen for voice input and return transcribed text, fallback to text input if voice unavailable."""
+        if self.microphone is None:
+            query = simpledialog.askstring("Input", "Voice not available. Enter your command:", parent=self.root)
+            return query.lower() if query else None
+        
+        try:
+            with self.microphone as source:
+                self.recognizer.adjust_for_ambient_noise(source, duration=1)
+                for _ in range(3):
+                    try:
+                        audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
+                        return self.recognizer.recognize_google(audio).lower()
+                    except sr.WaitTimeoutError:
+                        self.speak("No speech detected, please try again")
+                        continue
+                    except sr.UnknownValueError:
+                        self.speak("Could not understand audio, please try again")
+                        continue
+                    except sr.RequestError as e:
+                        self.speak(f"Speech recognition error: {str(e)}")
+                        return None
             return None
+        except Exception as e:
+            self.speak("Voice input failed. Please use text input.")
+            self.chat_box_insert(f"Output: Voice input failed: {str(e)}. Please use text input.\n")
+            query = simpledialog.askstring("Input", "Voice not available. Enter your command:", parent=self.root)
+            return query.lower() if query else None
 
     def listen_voice(self):
         """Continuously listen for voice commands while enabled."""
@@ -409,7 +499,7 @@ class IshaAssistant:
             self.play_song()
         elif "youtube" in command or "isha youtube" in command or "manoranjan suru kiya jaaye" in command:
             self.open_youtube()
-        elif "google" in command or "isha open google" in command or "google open now" in command:
+        elif "google" in command or "isha open google" in command or "google open now" in command or "open google" in command:
             self.open_google()
         elif "instagram" in command or "isha open instagram" in command or "instagram chalu karo" in command or "gili gili chu" in command or "gili gili chhu" in command or "gili gili suit" in command:
             self.open_instagram()
@@ -494,7 +584,7 @@ class IshaAssistant:
     def open_calculator(self):
         """Open the Windows Calculator app."""
         try:
-            subprocess.run(["start", "", "calc"], shell=True, check=True)
+            subprocess.run(["start", "calc"], shell=True, check=True)
             self.speak("Opening Calculator")
             self.chat_box_insert("Output: Opening Calculator\n")
         except subprocess.CalledProcessError as e:
@@ -554,7 +644,7 @@ class IshaAssistant:
     def open_about_settings(self):
         """Open About settings using Win+I."""
         try:
-            subprocess.run(["start", "", "ms-settings:about"], shell=True, check=True)
+            subprocess.run(["start", "ms-settings:about"], shell=True, check=True)
             self.speak("Opening about settings")
             self.chat_box_insert("Output: Opening about settings\n")
         except subprocess.CalledProcessError as e:
@@ -769,7 +859,12 @@ class IshaAssistant:
         for name, cmd in self.commands_dict.items():
             if command in [f"open {name.lower()}", f"open {name.lower().replace(' ', '')}", name.lower()]:
                 try:
-                    subprocess.run(["start", "", cmd] if cmd.startswith("ms-") else cmd, shell=True, check=True)
+                    if cmd.startswith("http"):
+                        webbrowser.open(cmd)
+                    elif cmd.startswith("ms-"):
+                        subprocess.run(["start", "", cmd], shell=True, check=True)
+                    else:
+                        subprocess.run(["start", "", cmd], shell=True, check=True)
                     self.speak(f"Opening {name}")
                     self.chat_box_insert(f"Output: Opening {name}\n")
                 except subprocess.CalledProcessError as e:
@@ -844,7 +939,7 @@ class IshaAssistant:
         if self.check_internet():
             self.speak("Do you want to search for something on YouTube?")
             query = self.listen()
-            if query:
+            if query and query not in ["none", "cancel", "no"]:
                 self.search_web("youtube", query)
                 self.speak(f"Searching for {query} on YouTube")
                 self.chat_box_insert(f"Output: Searching for {query} on YouTube\n")
@@ -863,7 +958,7 @@ class IshaAssistant:
         if self.check_internet():
             self.speak("What do you want to search?")
             query = self.listen()
-            if query:
+            if query and query not in ["none", "cancel", "no"]:
                 self.search_web("google", query)
                 self.speak(f"Searching for {query} on Google")
                 self.chat_box_insert(f"Output: Searching for {query} on Google\n")
@@ -885,14 +980,14 @@ class IshaAssistant:
         else:
             self.speak("Instagram requires an internet connection. Opening local Photos app instead.")
             self.chat_box_insert("Output: Instagram unavailable offline. Opening Photos app instead.\n")
-            subprocess.run(["start", "microsoft.photos:"], shell=True)
+            subprocess.run(["start", "", "microsoft.photos:"], shell=True)
 
     def login_instagram(self):
         """Log into Instagram using Selenium with GUI input."""
         if not self.check_internet():
             self.speak("Instagram requires an internet connection. Opening local Photos app instead.")
             self.chat_box_insert("Output: Instagram unavailable offline. Opening Photos app instead.\n")
-            subprocess.run(["start", "microsoft.photos:"], shell=True)
+            subprocess.run(["start", "", "microsoft.photos:"], shell=True)
             return
 
         def run_login():
@@ -962,7 +1057,7 @@ class IshaAssistant:
         if not self.check_internet():
             self.speak("WhatsApp requires an internet connection. Opening notepad instead.")
             self.chat_box_insert("Output: WhatsApp unavailable offline. Opening notepad instead.\n")
-            subprocess.run(["notepad"], shell=True)
+            subprocess.run(["start", "", "notepad"], shell=True)
             return
 
         self.speak("Please provide a phone number with country code.")
@@ -970,7 +1065,7 @@ class IshaAssistant:
         if contact and re.match(r"^\+\d{10,15}$", contact):
             self.speak("What message should I send?")
             message = self.listen()
-            if message:
+            if message and message not in ["none", "cancel", "no"]:
                 try:
                     webbrowser.open("https://web.whatsapp.com")
                     time.sleep(20)
@@ -1045,22 +1140,30 @@ class IshaAssistant:
 
     def shutdown_pc(self):
         """Shut down the PC."""
-        os.system("shutdown /s /t 1")
-        self.speak("Shutting down the PC")
-        self.chat_box_insert("Output: Shutting down the PC\n")
+        try:
+            subprocess.run(["shutdown", "/s", "/t", "1"], shell=True, check=True)
+            self.speak("Shutting down the PC")
+            self.chat_box_insert("Output: Shutting down the PC\n")
+        except subprocess.CalledProcessError as e:
+            self.speak("Failed to shut down the PC")
+            self.chat_box_insert(f"Output: Failed to shut down the PC: {str(e)}\n")
 
     def restart_pc(self):
         """Restart the PC."""
-        os.system("shutdown /r /t 1")
-        self.speak("Restarting the PC")
-        self.chat_box_insert("Output: Restarting the PC\n")
+        try:
+            subprocess.run(["shutdown", "/r", "/t", "1"], shell=True, check=True)
+            self.speak("Restarting the PC")
+            self.chat_box_insert("Output: Restarting the PC\n")
+        except subprocess.CalledProcessError as e:
+            self.speak("Failed to restart the PC")
+            self.chat_box_insert(f"Output: Failed to restart the PC: {str(e)}\n")
 
     def get_weather(self):
         """Fetch weather information for a specified city."""
         if self.check_internet():
             self.speak("Which city's weather do you want to check?")
             city = self.listen()
-            if not city:
+            if not city or city in ["none", "cancel", "no"]:
                 self.speak("No city provided. Please try again.")
                 self.chat_box_insert("Output: No city provided. Please try again.\n")
                 return
@@ -1095,7 +1198,7 @@ class IshaAssistant:
         if self.check_internet():
             self.speak("Tell me what to search")
             search_query = self.listen()
-            if search_query:
+            if search_query and search_query not in ["none", "cancel", "no"]:
                 webbrowser.open(f"https://www.google.com/search?q={search_query}")
                 self.speak(f"Searching for {search_query} on Google")
                 self.chat_box_insert(f"Output: Searching for {search_query} on Google\n")
