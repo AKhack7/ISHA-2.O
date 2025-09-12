@@ -23,6 +23,9 @@ import socket
 import glob
 import logging
 from dotenv import load_dotenv
+import urllib.request 
+import cv2 
+import numpy as np
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +36,7 @@ class IshaAssistant:
         self.root = root
         self.root.title("Isha Assistant")
         self.root.geometry("600x400")
+        self.root.configure(bg="#1e1e1e")  # Dark background for root window
         
         # Initialize logging
         logging.basicConfig(filename="isha_assistant.log", level=logging.INFO, 
@@ -272,36 +276,73 @@ class IshaAssistant:
         return False
 
     def create_gui(self):
-        """Create the GUI elements for the assistant."""
-        self.chat_box = scrolledtext.ScrolledText(self.root, height=10, width=60)
-        self.chat_box.pack(pady=10)
+        """Create the GUI elements for the assistant with dark mode styling."""
+        # Configure ttk style for dark mode
+        style = ttk.Style()
+        style.theme_use('clam')  # Use clam theme for better control over colors
         
-        self.input_box = ttk.Entry(self.root, width=50)
-        self.input_box.pack(pady=5)
+        # Configure styles
+        style.configure('TFrame', background='#1e1e1e')
+        style.configure('TButton', background='#333333', foreground='#ffffff', 
+                       font=('Arial', 10, 'bold'), borderwidth=1, focuscolor='#555555')
+        style.map('TButton', background=[('active', '#555555')])
+        
+        style.configure('Voice.Off.TButton', background='#ff5555', foreground='#ffffff')
+        style.map('Voice.Off.TButton', background=[('active', '#cc4444')])
+        style.configure('Voice.On.TButton', background='#55ff55', foreground='#000000')
+        style.map('Voice.On.TButton', background=[('active', '#44cc44')])
+        style.configure('Settings.TButton', background='#007acc', foreground='#ffffff')
+        style.map('Settings.TButton', background=[('active', '#005f99')])
+        style.configure('Apps.TButton', background='#ff9500', foreground='#ffffff')
+        style.map('Apps.TButton', background=[('active', '#cc7700')])
+        style.configure('FileM.TButton', background='#ffd700', foreground='#000000')
+        style.map('FileM.TButton', background=[('active', '#ccac00')])
+        style.configure('Download.TButton', background='#00b7eb', foreground='#ffffff')
+        style.map('Download.TButton', background=[('active', '#008bb8')])
+        style.configure('About.TButton', background='#ff69b4', foreground='#ffffff')
+        style.map('About.TButton', background=[('active', '#cc5290')])
+        
+        style.configure('TEntry', fieldbackground='#333333', foreground='#ffffff', 
+                       insertcolor='#ffffff', font=('Arial', 10))
+        style.configure('TLabel', background='#1e1e1e', foreground='#ffffff', 
+                       font=('Arial', 10))
+        
+        # Chat box
+        self.chat_box = scrolledtext.ScrolledText(self.root, height=10, width=60, 
+                                                bg='#2d2d2d', fg='#ffffff', 
+                                                insertbackground='#ffffff', 
+                                                font=('Arial', 10), 
+                                                bd=0, relief='flat')
+        self.chat_box.pack(pady=10, padx=10)
+        
+        # Input box
+        self.input_box = ttk.Entry(self.root, width=50, style='TEntry')
+        self.input_box.pack(pady=5, padx=10)
         self.input_box.bind("<Return>", self.process_text_input)
         
-        button_frame = ttk.Frame(self.root)
+        # Button frame
+        button_frame = ttk.Frame(self.root, style='TFrame')
         button_frame.pack(pady=10)
         
-        style = ttk.Style()
-        style.configure('Voice.Off.TButton', background='red', foreground='black')
-        style.configure('Voice.On.TButton', background='green', foreground='black')
-        style.configure('Settings.TButton', background='green', foreground='black')
-        style.configure('Apps.TButton', background='orange', foreground='black')
-        style.configure('FileM.TButton', background='yellow', foreground='black')
-        style.configure('Download.TButton', background='blue', foreground='black')
-        style.configure('About.TButton', background='pink', foreground='black')
-        
-        self.voice_button = ttk.Button(button_frame, text="V", style='Voice.Off.TButton', command=self.toggle_voice)
+        # Buttons
+        self.voice_button = ttk.Button(button_frame, text="V", style='Voice.Off.TButton', 
+                                      command=self.toggle_voice)
         self.voice_button.grid(row=0, column=0, padx=5)
         
-        ttk.Button(button_frame, text="Settings", style='Settings.TButton', command=self.toggle_settings).grid(row=0, column=1, padx=5)
-        ttk.Button(button_frame, text="Apps", style='Apps.TButton', command=self.toggle_apps).grid(row=0, column=2, padx=5)
-        ttk.Button(button_frame, text="File M", style='FileM.TButton', command=self.open_file_explorer).grid(row=0, column=3, padx=5)
-        ttk.Button(button_frame, text="Download", style='Download.TButton', command=self.open_downloads).grid(row=0, column=4, padx=5)
-        ttk.Button(button_frame, text="About", style='About.TButton', command=self.show_about).grid(row=0, column=5, padx=5)
+        ttk.Button(button_frame, text="Settings", style='Settings.TButton', 
+                  command=self.toggle_settings).grid(row=0, column=1, padx=5)
+        ttk.Button(button_frame, text="Apps", style='Apps.TButton', 
+                  command=self.toggle_apps).grid(row=0, column=2, padx=5)
+        ttk.Button(button_frame, text="File M", style='FileM.TButton', 
+                  command=self.open_file_explorer).grid(row=0, column=3, padx=5)
+        ttk.Button(button_frame, text="Download", style='Download.TButton', 
+                  command=self.open_downloads).grid(row=0, column=4, padx=5)
+        ttk.Button(button_frame, text="About", style='About.TButton', 
+                  command=self.show_about).grid(row=0, column=5, padx=5)
         
-        self.status_label = ttk.Label(self.root, text="Internet: Checking...")
+        # Status label
+        self.status_label = ttk.Label(self.root, text="Internet: Checking...", 
+                                     style='TLabel')
         self.status_label.pack(pady=5)
         self.update_internet_status()
         
@@ -471,6 +512,8 @@ class IshaAssistant:
             self.open_run_command()
         elif command in ["open setting"]:
             self.open_settings()
+        elif command in ["ok isha","ok google"]:
+            self.find_now()    
         elif command in ["open about setting", "about this pc"]:
             self.open_about_settings()
         elif command in ["open project screen", "show project screen"]:
@@ -503,6 +546,12 @@ class IshaAssistant:
             self.open_google()
         elif "instagram" in command or "isha open instagram" in command or "instagram chalu karo" in command or "gili gili chu" in command or "gili gili chhu" in command or "gili gili suit" in command:
             self.open_instagram()
+        elif "iti" in command:
+            self.open_25()
+        elif "open phone camera" in command:
+            self.came2()
+        elif "phone camera off" in command:
+            self.cmaw21()
         elif "h1" in command.lower() or "open h1" in command or "isha open h1" in command:
             self.open_chatbox()
         elif "download photo" in command or "download picture" in command or "isha download photo" in command or "isha download picture" in command or "dd photo" in command or "dd picture" in command:
@@ -567,6 +616,27 @@ class IshaAssistant:
         except Exception as e:
             self.speak("Error retrieving date")
             self.chat_box_insert(f"Output: Error retrieving date: {str(e)}\n")
+
+    def find_now(self):
+        self.speak("What do you want me to search?")
+        query = self.listen() 
+        if query: 
+            url = f"https://www.google.com/search?q={query}"
+            webbrowser.open(url)
+            self.speak(f"Searching for {query}")
+        else:
+            self.speak("I didn't catch that. Please try again.")
+
+    def came2(self):
+        URL = "https://192.168.43.1:8080/shot.jpg"
+        while True:
+              img_arr = np.array(bytearray(urllib.request.urlopen(URL).read()),dtype=np.uint8)
+              img = cv2.imdecode(img_arr,-1)
+              cv2.imshow('IPWebcam',img)
+              q = cv2.waitKey(1)
+              if q == ord("q"):
+                break;
+        cv2.destroyAllWindows()
 
     def solve_math(self, expression):
         """Solve a mathematical expression using sympy."""
@@ -691,6 +761,9 @@ class IshaAssistant:
             self.speak("Failed to open game bar")
             self.chat_box_insert(f"Output: Failed to open game bar: {str(e)}\n")
 
+    def open_25(self):
+        webbrowser.open("https://itiadmission.gujarat.gov.in/")        
+
     def open_voice_typing(self):
         """Open voice typing using Win+H."""
         try:
@@ -785,10 +858,13 @@ class IshaAssistant:
             return
         self.settings_popup = tk.Toplevel(self.root)
         self.settings_popup.title("Settings")
-        listbox = tk.Listbox(self.settings_popup, width=50, height=20)
+        self.settings_popup.configure(bg="#1e1e1e")
+        listbox = tk.Listbox(self.settings_popup, width=50, height=20, 
+                            bg="#2d2d2d", fg="#ffffff", 
+                            font=('Arial', 10), bd=0, highlightthickness=0)
         for setting in self.settings_list:
             listbox.insert(tk.END, setting)
-        listbox.pack(pady=10)
+        listbox.pack(pady=10, padx=10)
 
     def toggle_apps(self):
         """Toggle the apps popup window."""
@@ -804,10 +880,13 @@ class IshaAssistant:
             return
         self.apps_popup = tk.Toplevel(self.root)
         self.apps_popup.title("Apps")
-        listbox = tk.Listbox(self.apps_popup, width=50, height=20)
+        self.apps_popup.configure(bg="#1e1e1e")
+        listbox = tk.Listbox(self.apps_popup, width=50, height=20, 
+                            bg="#2d2d2d", fg="#ffffff", 
+                            font=('Arial', 10), bd=0, highlightthickness=0)
         for app in self.apps_list:
             listbox.insert(tk.END, app)
-        listbox.pack(pady=10)
+        listbox.pack(pady=10, padx=10)
 
     def open_file_explorer(self):
         """Open File Explorer."""
@@ -835,22 +914,28 @@ class IshaAssistant:
         popup = tk.Toplevel(self.root)
         popup.title("Windows Settings List")
         popup.geometry("500x600")
-        popup.configure(bg="white")
-        label = tk.Label(popup, text="Settings List", font=("Arial", 14, "bold"), bg="white")
+        popup.configure(bg="#1e1e1e")
+        label = tk.Label(popup, text="Settings List", font=("Arial", 14, "bold"), 
+                        bg="#1e1e1e", fg="#ffffff")
         label.pack(pady=10)
         setting_text = ""
         for name, (_, code) in self.SETTING_MAP.items():
             setting_text += f"{name.title()} ({code})\n"
-        text_area = scrolledtext.ScrolledText(popup, wrap=tk.WORD, width=60, height=30, font=("Arial", 10), bg="#f0f0f0")
+        text_area = scrolledtext.ScrolledText(popup, wrap=tk.WORD, width=60, height=30, 
+                                            font=("Arial", 10), bg="#2d2d2d", 
+                                            fg="#ffffff", insertbackground="#ffffff", 
+                                            bd=0, relief='flat')
         text_area.insert(tk.END, setting_text)
         text_area.configure(state='disabled')
-        text_area.pack(pady=10)
+        text_area.pack(pady=10, padx=10)
 
     def show_about(self):
         """Show information about the assistant."""
         about_popup = tk.Toplevel(self.root)
         about_popup.title("About")
-        tk.Label(about_popup, text="Isha Assistant - Your personal desktop assistant").pack(pady=10)
+        about_popup.configure(bg="#1e1e1e")
+        tk.Label(about_popup, text="Isha Assistant - Your personal desktop assistant", 
+                 font=("Arial", 12), bg="#1e1e1e", fg="#ffffff").pack(pady=10)
         self.speak("Isha Assistant, your personal desktop assistant")
         self.chat_box_insert("Output: Isha Assistant, your personal desktop assistant\n")
 
@@ -1130,6 +1215,13 @@ class IshaAssistant:
         pyautogui.press('f')
         self.speak("Toggling full screen")
         self.chat_box_insert("Output: Toggling full screen\n")
+
+    def cmaw21(self):
+        """Toggle full screen for media."""
+        time.sleep(1)
+        pyautogui.press('q')
+        self.speak("phone camera is disconnect")
+        self.chat_box_insert("Output: camera is disconnect\n")
 
     def toggle_caption(self):
         """Toggle captions for media."""
