@@ -59,11 +59,12 @@ class IshaAssistant:
         
         # Initialize speech recognition
         self.recognizer = sr.Recognizer()
+        self.recognizer.dynamic_energy_threshold = True
         self.microphone = None
         try:
             self.microphone = sr.Microphone()
             with self.microphone as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)  # Shorter duration for quicker start
+                self.recognizer.adjust_for_ambient_noise(source, duration=1)  # Increased duration
         except (AttributeError, OSError, sr.RequestError) as e:
             logging.error(f"Microphone initialization failed: {str(e)}")
             self.chat_box_insert("Output: Voice recognition disabled. PyAudio not found or microphone issue. Please install PyAudio and check microphone.\n")
@@ -417,18 +418,23 @@ class IshaAssistant:
         
         try:
             with self.microphone as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)  # Adjusted for better recognition
-                audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=10)  # Increased timeouts
-                return self.recognizer.recognize_google(audio).lower()
-        except sr.WaitTimeoutError:
-            self.speak("No speech detected. Please try again.")
-            return None
-        except sr.UnknownValueError:
-            self.speak("Could not understand audio. Please try again.")
-            return None
-        except sr.RequestError as e:
-            self.speak(f"Speech recognition service error: {str(e)}. Falling back to text input.")
-            query = simpledialog.askstring("Input", "Voice input failed. Enter your command:", parent=self.root)
+                self.recognizer.adjust_for_ambient_noise(source, duration=1)  # Increased for better adjustment
+                for _ in range(3):  # Retry up to 3 times
+                    try:
+                        audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=10)
+                        return self.recognizer.recognize_google(audio).lower()
+                    except sr.WaitTimeoutError:
+                        self.speak("No speech detected, retrying...")
+                        continue
+                    except sr.UnknownValueError:
+                        self.speak("Could not understand audio, retrying...")
+                        continue
+                    except sr.RequestError as e:
+                        self.speak(f"Speech recognition service error: {str(e)}. Falling back to text input.")
+                        query = simpledialog.askstring("Input", "Voice input failed. Enter your command:", parent=self.root)
+                        return query.lower() if query else None
+            self.speak("Voice input failed after retries. Please use text input.")
+            query = simpledialog.askstring("Input", "Voice not available. Enter your command:", parent=self.root)
             return query.lower() if query else None
         except Exception as e:
             self.speak("Voice input failed. Please use text input.")
