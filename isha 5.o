@@ -645,6 +645,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Error retrieving time: {str(e)}"
             self.speak(message)
@@ -659,6 +660,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Error retrieving date: {str(e)}"
             self.speak(message)
@@ -706,6 +708,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open phone camera: {str(e)}"
             self.speak(message)
@@ -722,6 +725,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Sorry, I couldn't solve that math problem: {str(e)}"
             self.speak(message)
@@ -736,6 +740,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except subprocess.CalledProcessError as e:
             message = f"Failed to open Calculator: {str(e)}"
             self.speak(message)
@@ -750,6 +755,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to minimize windows: {str(e)}"
             self.speak(message)
@@ -764,6 +770,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open search: {str(e)}"
             self.speak(message)
@@ -778,6 +785,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open news widget: {str(e)}"
             self.speak(message)
@@ -792,6 +800,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open run command: {str(e)}"
             self.speak(message)
@@ -806,6 +815,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open settings: {str(e)}"
             self.speak(message)
@@ -820,6 +830,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except subprocess.CalledProcessError as e:
             message = f"Failed to open about settings: {str(e)}"
             self.speak(message)
@@ -834,6 +845,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open project screen: {str(e)}"
             self.speak(message)
@@ -848,6 +860,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open performance settings: {str(e)}"
             self.speak(message)
@@ -862,6 +875,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open feedback hub: {str(e)}"
             self.speak(message)
@@ -876,6 +890,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open game bar: {str(e)}"
             self.speak(message)
@@ -890,6 +905,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open ITI website: {str(e)}"
             self.speak(message)
@@ -904,6 +920,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open Google: {str(e)}"
             self.speak(message)
@@ -918,6 +935,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open YouTube: {str(e)}"
             self.speak(message)
@@ -932,6 +950,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open Instagram: {str(e)}"
             self.speak(message)
@@ -946,6 +965,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open voice typing: {str(e)}"
             self.speak(message)
@@ -960,6 +980,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open connect panel: {str(e)}"
             self.speak(message)
@@ -974,6 +995,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to lock screen: {str(e)}"
             self.speak(message)
@@ -988,6 +1010,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open quick menu: {str(e)}"
             self.speak(message)
@@ -1002,6 +1025,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open Cortana: {str(e)}"
             self.speak(message)
@@ -1016,6 +1040,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open clipboard history: {str(e)}"
             self.speak(message)
@@ -1030,6 +1055,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open notifications: {str(e)}"
             self.speak(message)
@@ -1044,6 +1070,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to select all text: {str(e)}"
             self.speak(message)
@@ -1059,6 +1086,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         else:
             self.show_settings_popup()
 
@@ -1078,6 +1106,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def on_settings_select(self, event):
         listbox = event.widget
@@ -1095,6 +1124,7 @@ class IshaAssistant:
                     self.speak(message)
                     self.chat_box_insert(f"Output: {message}\n")
                     print(message)
+                    self.speak(message)
                 except subprocess.CalledProcessError as e:
                     message = f"Failed to open {display}: {str(e)}"
                     self.speak(message)
@@ -1110,6 +1140,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         else:
             self.show_apps_popup()
 
@@ -1129,6 +1160,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def on_apps_select(self, event):
         listbox = event.widget
@@ -1146,6 +1178,7 @@ class IshaAssistant:
                     self.speak(message)
                     self.chat_box_insert(f"Output: {message}\n")
                     print(message)
+                    self.speak(message)
                 except subprocess.CalledProcessError as e:
                     message = f"Failed to open {display}: {str(e)}"
                     self.speak(message)
@@ -1160,6 +1193,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except subprocess.CalledProcessError as e:
             message = f"Failed to open File Explorer: {str(e)}"
             self.speak(message)
@@ -1175,6 +1209,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except subprocess.CalledProcessError as e:
             message = f"Failed to open Downloads folder: {str(e)}"
             self.speak(message)
@@ -1204,6 +1239,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def show_about(self):
         """Show information about the assistant."""
@@ -1216,6 +1252,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def handle_settings_apps_commands(self, command):
         """Handle commands to open settings or apps."""
@@ -1232,6 +1269,7 @@ class IshaAssistant:
                     self.speak(message)
                     self.chat_box_insert(f"Output: {message}\n")
                     print(message)
+                    self.speak(message)
                     return
                 except subprocess.CalledProcessError as e:
                     message = f"Failed to open {name}: {str(e)}"
@@ -1243,6 +1281,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def speak(self, text):
         """Speak the given text using text-to-speech with improved reliability."""
@@ -1265,7 +1304,8 @@ class IshaAssistant:
                 logging.error(f"Speech error: {str(e)} - Text: {text}")
                 # Fallback: show in chat box but don't print to console
                 self.chat_box_insert(f"Output: Speech failed for '{text}'. Please check audio settings.\n")
-        
+                
+
         # Run speech in a separate thread to avoid blocking
         threading.Thread(target=run_speak, daemon=True).start()
         time.sleep(0.7)  # Increased delay to ensure engine processes
@@ -1290,10 +1330,17 @@ class IshaAssistant:
                 "https://youtu.be/AX6OrbgS8lI?si=l5miVi6KYBdpcxjY",
                 "https://youtu.be/TkAiQJzctFY?si=ftSyKFuCJ0ufYHv4",
                 "https://youtu.be/TkAiQJzctFY?si=JBG-YdzoTZEAsKgV",
-                "https://youtu.be/uFbayWnLGxs?si=–VMABpuHCU2RMP2",
+                "https://youtu.be/uFbayWnLGxs?si=VMABpuHCU2RMP2",
                 "https://youtu.be/9KCtZ9r4OAw?si=e7n28CCQ1bL699uR",
                 "https://youtu.be/uSb0M_UQE1o?si=gk3WGAU7979W_jBd",
-                "https://youtu.be/FudfVyYWNxQ?si=PBCUyE56uU52OsO9"
+                "https://youtu.be/FudfVyYWNxQ?si=PBCUyE56uU52OsO9",
+                "https://youtu.be/wCTmWy43HgM?si=Tp3ImatGlTlD1oFS",
+                "https://youtu.be/9CJfSLzELfM?si=aXaynELQNGWk_TZI",
+                "https://youtu.be/wCTmWy43HgM?si=Tp3ImatGlTlD1oFS",
+                "https://youtu.be/M7Jh8PJH3lA?si=pqhpLC2ree8DrnkS",
+                "https://youtu.be/n2dVFdqMYGA?si=cjwue3W9RijU4h8F",
+                "https://youtu.be/DxsDekHDKXo?si=As4lEiMD8JA3yohC",
+                "https://youtu.be/s0bJkT5EyTc?si=qLJKp-us7oauGrLt"
             ]
             url = random.choice(playlist_links)
             webbrowser.open(url)
@@ -1303,6 +1350,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         else:
             music_dir = os.path.join(os.path.expanduser("~"), "Music")
             music_files = glob.glob(os.path.join(music_dir, "*.mp3")) + glob.glob(os.path.join(music_dir, "*.wav"))
@@ -1313,11 +1361,13 @@ class IshaAssistant:
                 self.speak(message)
                 self.chat_box_insert(f"Output: {message}\n")
                 print(message)
+                self.speak(message)
             else:
                 message = "No internet connection and no local music files found"
                 self.speak(message)
                 self.chat_box_insert(f"Output: {message}\n")
                 print(message)
+                self.speak(message)
 
     def search_web(self, platform, query):
         """Search on YouTube or Google."""
@@ -1331,6 +1381,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to search on {platform}: {str(e)}"
             self.speak(message)
@@ -1344,6 +1395,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
             subprocess.run(["start", "", "microsoft.photos:"], shell=True)
             return
 
@@ -1400,11 +1452,13 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open chatbox: {str(e)}"
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
 
     def download_picture(self):
         """Open Pixabay for downloading pictures."""
@@ -1414,6 +1468,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open Pixabay: {str(e)}"
             self.speak(message)
@@ -1428,6 +1483,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
         except Exception as e:
             message = f"Failed to open Instagram reel downloader: {str(e)}"
             self.speak(message)
@@ -1441,10 +1497,12 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
             subprocess.run(["start", "", "notepad"], shell=True)
             return
 
         message = "Please provide a phone number with country code."
+        self.speak(message)
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
@@ -1464,6 +1522,7 @@ class IshaAssistant:
                     self.speak(message)
                     self.chat_box_insert(f"Output: {message}\n")
                     print(message)
+                    self.speak(message)
                 except Exception as e:
                     message = f"Failed to send WhatsApp message: {str(e)}"
                     self.speak(message)
@@ -1474,6 +1533,7 @@ class IshaAssistant:
                 self.speak(message)
                 self.chat_box_insert(f"Output: {message}\n")
                 print(message)
+                self.speak(message)
         else:
             message = "Invalid or no contact provided. Please use country code, e.g., +1234567890"
             self.speak(message)
@@ -1482,11 +1542,12 @@ class IshaAssistant:
 
     def hello(self):
         """Respond to a greeting."""
-        responses = ["Hi!", "Kaise ho?"]
+        responses = ["Hi!", "hello there..?"]
         message = random.choice(responses)
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def thank_you_reply(self):
         """Respond to a thank you."""
@@ -1495,6 +1556,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def what_is_your_name(self):
         """Respond with the assistant's name."""
@@ -1503,6 +1565,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def morningtime(self):
         """Respond to a morning greeting."""
@@ -1511,6 +1574,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def stop_song(self):
         """Stop the currently playing song."""
@@ -1520,6 +1584,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def mute_unmute(self):
         """Toggle mute/unmute for media."""
@@ -1529,6 +1594,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def full_screen(self):
         """Toggle full screen for media."""
@@ -1538,6 +1604,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def cmaw21(self):
         """Disconnect phone camera."""
@@ -1547,6 +1614,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def toggle_caption(self):
         """Toggle captions for media."""
@@ -1556,6 +1624,7 @@ class IshaAssistant:
         self.speak(message)
         self.chat_box_insert(f"Output: {message}\n")
         print(message)
+        self.speak(message)
 
     def shutdown_pc(self):
         """Shut down the PC."""
@@ -1564,6 +1633,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
             time.sleep(10)  # Give time to cancel for demo
             subprocess.run(["shutdown", "/s", "/t", "1"], shell=True, check=True)
         except subprocess.CalledProcessError as e:
@@ -1579,6 +1649,7 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
             time.sleep(10)  # Give time to cancel for demo
             subprocess.run(["shutdown", "/r", "/t", "1"], shell=True, check=True)
         except subprocess.CalledProcessError as e:
@@ -1594,12 +1665,14 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+            self.speak(message)
             city = self.listen()
             if not city or city.lower() in ["none", "cancel", "no"]:
                 message = "No city provided. Please try again."
                 self.speak(message)
                 self.chat_box_insert(f"Output: {message}\n")
                 print(message)
+                self.speak(message)
                 return
             try:
                 # Use wttr.in API with a more specific format
@@ -1619,6 +1692,7 @@ class IshaAssistant:
                 self.speak(message)
                 self.chat_box_insert(f"Output: {message}\n")
                 print(message)
+                self.speak(message)
             except requests.RequestException as e:
                 message = f"Failed to fetch weather for {city}: {str(e)}. Please check the city name or internet connection."
                 self.speak(message)
@@ -1633,6 +1707,7 @@ class IshaAssistant:
                         self.speak(message)
                         self.chat_box_insert(f"Output: {message}\n")
                         print(message)
+                        self.speak(message)
                         return
                     city, weather_info, timestamp = cache_data.split(":", 2)
                     age = int(time.time()) - int(timestamp)
@@ -1646,6 +1721,7 @@ class IshaAssistant:
                         self.speak(message)
                         self.chat_box_insert(f"Output: {message}\n")
                         print(message)
+                        self.speak(message)
             except (FileNotFoundError, ValueError) as e:
                 message = f"No internet connection and no valid cached weather available: {str(e)}."
                 self.speak(message)
