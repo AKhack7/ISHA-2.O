@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, simpledialog
 import pyttsx3
 import speech_recognition as sr
 import datetime
@@ -12,38 +12,62 @@ import random
 import subprocess
 import re
 import threading
-import requests
+import socket
+import glob
+import logging
 from sympy import sympify, sin, cos, tan, sqrt, pi
+import urllib.request 
+import cv2 
+import numpy as np
+import requests
+import queue
+from gtts import gTTS
+import pygame  # For playing the saved MP3
+
+# Initialize logging
+logging.basicConfig(filename="isha_assistant.log", level=logging.INFO, 
+                    format="%(asctime)s - %(levelname)s - %(message)s")
 
 class IshaAssistant:
+    """A personal desktop assistant with voice and text command capabilities."""
     def __init__(self, root):
         self.root = root
         self.root.title("Isha Assistant")
         self.root.geometry("600x400")
+        self.root.configure(bg="#1e1e1e")  # Dark background for root window
         
         # Initialize text-to-speech
         self.engine = pyttsx3.init()
-        voices = self.engine.getProperty('voices')
-        for voice in voices:
-            if "female" in voice.name.lower():
-                self.engine.setProperty('voice', voice.id)
-                break
-        
-        # Initialize speech recognition
+        self.engine.setProperty('rate', 150)
+        self.engine.setProperty('volume', 0.9)
+        # Speech queue + background thread to serialize TTS (prevents pyttsx3 conflicts)
+        self.speech_queue = queue.Queue()
+        self.speech_thread = threading.Thread(target=self._speech_loop, daemon=True)
+        self.speech_thread.start()
+
         self.recognizer = sr.Recognizer()
+        self.recognizer.dynamic_energy_threshold = True
+        self.microphone = None
         try:
             self.microphone = sr.Microphone()
-        except Exception as e:
-            self.speak("Failed to initialize microphone. Please check your audio device.")
-            print(f"Microphone initialization error: {str(e)}")
-            self.microphone = None
+            with self.microphone as source:
+                self.recognizer.adjust_for_ambient_noise(source, duration=1)
+        except (AttributeError, OSError, sr.RequestError) as e:
+            logging.error(f"Microphone initialization failed: {str(e)}")
+            self.create_gui()
+            message = "Voice recognition disabled. PyAudio not found or microphone issue. Please install PyAudio and check microphone."
+            self.speak(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
         
         self.is_listening = False
+        self.last_internet_check = 0
+        self.internet_status = False
+        self.internet_check_interval = 10
         
-        # GUI Elements
         self.create_gui()
+        self.set_female_voice()
         
-        # Settings and Apps lists
         self.SETTING_MAP = {
             "display setting": ("ms-settings:display", "01"),
             "sound setting": ("ms-settings:sound", "03"),
@@ -51,7 +75,7 @@ class IshaAssistant:
             "focus assist setting": ("ms-settings:quiethours", "08"),
             "power & sleep setting": ("ms-settings:powersleep", "04"),
             "storage setting": ("ms-settings:storagesense", "05"),
-            "tablet setting": ("ms-settings:tablet", "03"),
+            "tablet setting": ("ms-settings:tablet", "06"),
             "multitasking setting": ("ms-settings:multitasking", "088"),
             "projecting to this pc setting": ("ms-settings:project", "099"),
             "shared experiences setting": ("ms-settings:crossdevice", "076"),
@@ -76,7 +100,7 @@ class IshaAssistant:
 
         self.apps_commands = {
             "alarms & clock": "ms-clock:",
-            "calculate": "calculator:",
+            "calculator": "calc",
             "calendar": "outlookcal:",
             "camera": "microsoft.windows.camera:",
             "copilot": "ms-copilot:",
@@ -85,7 +109,7 @@ class IshaAssistant:
             "groove music": "mswindowsmusic:",
             "mail": "outlookmail:",
             "maps": "bingmaps:",
-            "microsoft edge": "msedge:",
+            "microsoft edge": "msedge",
             "microsoft solitaire collection": "ms-solitaire:",
             "microsoft store": "ms-windows-store:",
             "mixed reality portal": "ms-mixedreality:",
@@ -95,17 +119,17 @@ class IshaAssistant:
             "onenote": "ms-onenote:",
             "outlook": "outlookmail:",
             "outlook (classic)": "ms-outlook:",
-            "paint": "mspaint:",
+            "paint": "mspaint",
             "paint 3d": "ms-paint:",
             "phone link": "ms-phonelink:",
             "power point": "ms-powerpoint:",
             "settings": "ms-settings:",
             "skype": "skype:",
             "snip & sketch": "ms-snip:",
-            "stucky note": "ms-sticky:",
+            "sticky note": "ms-stickynotes:",
             "tips": "ms-tips:",
-            "voice recorder": "ms Soundrecorder:",
-            "whether": "msnweather:",
+            "voice recorder": "ms-soundrecorder:",
+            "weather": "msnweather:",
             "windows backup": "ms-settings:backup",
             "windows security": "ms-settings:windowsdefender",
             "word": "ms-word:",
@@ -115,173 +139,475 @@ class IshaAssistant:
 
         self.software_dict = {
             "notepad": "notepad",
-            "setting": "ms-settings:",
-            "ms word": "start winword",
+            "ms word": "winword",
             "command prompt": "cmd",
-            "paint": "mspaint",
-            "excel": "start excel",
+            "excel": "excel",
             "vscode": "code",
-            "word16": "start winword",
+            "word16": "winword",
             "file explorer": "explorer",
-            "edge": "start msedge",
+            "edge": "msedge",
             "microsoft 365 copilot": "ms-copilot:",
-            "outlook": "start outlook",
-            "microsoft store": "start ms-windows-store:",
-            "photos": "start microsoft.photos:",
-            "settings": "start ms-settings:",
-            "xbox": "start xbox:",
-            "solitaire": "start microsoft.microsoftsolitairecollection:",
-            "clipchamp": "start clipchamp",
-            "to do": "start microsoft.todos:",
-            "linkedin": "start https://www.linkedin.com",
+            "outlook": "outlook",
+            "microsoft store": "ms-windows-store:",
+            "photos": "microsoft.photos:",
+            "xbox": "xbox:",
+            "solitaire": "microsoft.microsoftsolitairecollection:",
+            "clipchamp": "clipchamp",
+            "to do": "microsoft.todos:",
+            "linkedin": "https://www.linkedin.com",
             "calculator": "calc",
-            "news": "start bingnews:",
-            "one drive": "start onedrive",
-            "onenote 2016": "start onenote"
+            "news": "bingnews:",
+            "one drive": "onedrive",
+            "onenote 2016": "onenote",
+            "google": "https://www.google.com"
         }
 
-        self.settings_list = [f"{name} ({code})" for name, (_, code) in self.SETTING_MAP.items()]
-        self.apps_list = list(self.apps_commands.keys())
-        self.wish_me()  # Greet on startup
+        self.commands_dict = {**self.SETTING_MAP, **self.apps_commands, **self.software_dict}
+        self.commands_dict = {k: v if isinstance(v, str) else v[0] for k, v in self.commands_dict.items()}
+        self.settings_display_to_cmd = {f"{name} ({code})": cmd for name, (cmd, code) in self.SETTING_MAP.items()}
+        self.apps_display_to_cmd = {name: cmd for name, cmd in self.apps_commands.items()}
+        
+        self.wish_me()
+        self.last_enter_time = 0
+        self.root.bind('<Return>', self.handle_double_enter)
+
+    def _speech_loop(self):
+        """Background loop that takes texts from queue and speaks them one-by-one."""
+        while True:
+            try:
+                text = self.speech_queue.get()
+                if text is None:  # sentinel to stop (not used here, but safe)
+                    break
+                try:
+                    self.engine.say(text)
+                    self.engine.runAndWait()
+                    logging.info(f"Spoken (queue): {text}")
+                except Exception as e:
+                    logging.error(f"TTS run error: {e} - Text: {text}")
+                    try:
+                        self.chat_box_insert(f"Output: (Speech failed) {text}\n")
+                    except Exception:
+                        pass
+                finally:
+                    self.speech_queue.task_done()
+            except Exception as e:
+                logging.error(f"Speech loop unexpected error: {e}")
+                time.sleep(0.5)
+
+    def speak(self, text):
+        """Enqueue text to be spoken by the background TTS thread."""
+        try:
+            if not text:
+                return
+            self.speech_queue.put(str(text))
+        except Exception as e:
+            logging.error(f"Failed to enqueue speech: {e} - Text: {text}")
+            try:
+                self.chat_box_insert(f"Output: (Speech enqueue failed) {text}\n")
+            except Exception:
+                pass
+
+    def speak_gtts(self, text):
+        """Use gTTS to generate and play speech for the message."""
+        try:
+            if not text:
+                return
+            language = "en"
+            tts = gTTS(text=str(text), lang=language, slow=False, tld="com.au")
+            filename = "temp_message.mp3"
+            tts.save(filename)
+            
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            
+            pygame.mixer.music.load(filename)
+            pygame.mixer.music.play()
+            
+            while pygame.mixer.music.get_busy():
+                time.sleep(0.1)
+            
+            os.remove(filename)
+            
+            logging.info(f"gTTS Spoken: {text}")
+        except Exception as e:
+            logging.error(f"gTTS speech failed: {e} - Text: {text}")
+            self.speak(text)
+
+    def set_female_voice(self):
+        """Set the TTS engine to use a female voice, with fallback and logging."""
+        try:
+            voices = self.engine.getProperty('voices')
+            selected_voice = None
+            
+            logging.info("Available voices: %s", [voice.name for voice in voices])
+            
+            for voice in voices:
+                if "zira" in voice.name.lower() or "female" in voice.name.lower():
+                    selected_voice = voice
+                    break
+            
+            if not selected_voice:
+                selected_voice = voices[0] if voices else None
+                logging.warning("No female voice found, falling back to default voice")
+                message = "No female voice available, using default voice."
+                self.speak(message)
+            else:
+                logging.info("Selected female voice: %s", selected_voice.name)
+            
+            if selected_voice:
+                self.engine.setProperty('voice', selected_voice.id)
+                self.engine.say("Initializing voice")
+                self.engine.runAndWait()
+            else:
+                logging.error("No voices available for text-to-speech")
+                message = "No voices available for text-to-speech. Please check system TTS settings."
+                self.speak(message)
+                self.chat_box_insert(f"Output: {message}\n")
+        except Exception as e:
+            logging.error(f"Failed to set female voice: {str(e)}")
+            message = "Failed to initialize text-to-speech. Please check audio drivers or TTS installation."
+            self.speak(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(f"Error: {message}")
+
+    def handle_double_enter(self, event):
+        current_time = time.time()
+        if current_time - self.last_enter_time < 0.5:  # Within 0.5 seconds for double press
+            self.input_box.focus_set()
+        self.last_enter_time = current_time
+
+    def check_internet(self):
+        """Check internet connectivity with caching."""
+        current_time = time.time()
+        if current_time - self.last_internet_check < self.internet_check_interval:
+            return self.internet_status
+
+        self.last_internet_check = current_time
+        for host in [("8.8.8.8", 80), ("1.1.1.1", 80)]:
+            try:
+                socket.create_connection(host, timeout=2)
+                self.internet_status = True
+                return True
+            except (socket.gaierror, socket.timeout):
+                continue
+        self.internet_status = False
+        return False
 
     def create_gui(self):
-        # Chat box
-        self.chat_box = scrolledtext.ScrolledText(self.root, height=10, width=60)
-        self.chat_box.pack(pady=10)
+        """Create the GUI elements for the assistant with dark mode styling."""
+        style = ttk.Style()
+        style.theme_use('clam')
         
-        # Input box
-        self.input_box = ttk.Entry(self.root, width=50)
-        self.input_box.pack(pady=5)
+        style.configure('TFrame', background='#1e1e1e')
+        style.configure('TButton', background='#333333', foreground='#ffffff', 
+                       font=('Arial', 10, 'bold'), borderwidth=1, focuscolor='#555555')
+        style.map('TButton', background=[('active', '#555555')])
+        
+        style.configure('Voice.Off.TButton', background='#ff5555', foreground='#ffffff')
+        style.map('Voice.Off.TButton', background=[('active', '#cc4444')])
+        style.configure('Voice.On.TButton', background='#55ff55', foreground='#000000')
+        style.map('Voice.On.TButton', background=[('active', '#44cc44')])
+        style.configure('Settings.TButton', background='#007acc', foreground='#ffffff')
+        style.map('Settings.TButton', background=[('active', '#005f99')])
+        style.configure('Apps.TButton', background='#ff9500', foreground='#ffffff')
+        style.map('Apps.TButton', background=[('active', '#cc7700')])
+        style.configure('FileM.TButton', background='#ffd700', foreground='#000000')
+        style.map('FileM.TButton', background=[('active', '#ccac00')])
+        style.configure('Download.TButton', background='#00b7eb', foreground='#ffffff')
+        style.map('Download.TButton', background=[('active', '#008bb8')])
+        style.configure('About.TButton', background='#ff69b4', foreground='#ffffff')
+        style.map('About.TButton', background=[('active', '#cc5290')])
+        
+        style.configure('TEntry', fieldbackground='#333333', foreground='#ffffff', 
+                       insertcolor='#ffffff', font=('Arial', 10))
+        style.configure('TLabel', background='#1e1e1e', foreground='#ffffff', 
+                       font=('Arial', 10))
+        
+        self.chat_box = scrolledtext.ScrolledText(self.root, height=10, width=60, 
+                                                bg='#2d2d2d', fg='#ffffff', 
+                                                insertbackground='#ffffff', 
+                                                font=('Arial', 10), 
+                                                bd=0, relief='flat')
+        self.chat_box.pack(pady=10, padx=10)
+        
+        self.input_box = ttk.Entry(self.root, width=50, style='TEntry')
+        self.input_box.pack(pady=5, padx=10)
         self.input_box.bind("<Return>", self.process_text_input)
         
-        # Buttons frame
-        button_frame = ttk.Frame(self.root)
+        button_frame = ttk.Frame(self.root, style='TFrame')
         button_frame.pack(pady=10)
         
-        # Configure styles
-        style = ttk.Style()
-        style.configure('Voice.TButton', background='red', foreground='white')
-        style.configure('Voice.Off.TButton', background='gray', foreground='white')
-        style.configure('Settings.TButton', background='green', foreground='white')
-        style.configure('Apps.TButton', background='orange', foreground='black')
-        style.configure('FileM.TButton', background='yellow', foreground='black')
-        style.configure('Download.TButton', background='blue', foreground='white')
-        style.configure('About.TButton', background='pink', foreground='black')
-        
-        # Voice button
-        self.voice_button = ttk.Button(button_frame, text="V", style='Voice.Off.TButton', command=self.toggle_voice)
+        self.voice_button = ttk.Button(button_frame, text="Mic", style='Voice.Off.TButton', 
+                                      command=self.toggle_voice)
         self.voice_button.grid(row=0, column=0, padx=5)
         
-        # Other buttons
-        ttk.Button(button_frame, text="Settings", style='Settings.TButton', command=self.toggle_settings).grid(row=0, column=1, padx=5)
-        ttk.Button(button_frame, text="Apps", style='Apps.TButton', command=self.toggle_apps).grid(row=0, column=2, padx=5)
-        ttk.Button(button_frame, text="File M", style='FileM.TButton', command=self.open_file_explorer).grid(row=0, column=3, padx=5)
-        ttk.Button(button_frame, text="Download", style='Download.TButton', command=self.open_downloads).grid(row=0, column=4, padx=5)
-        ttk.Button(button_frame, text="About", style='About.TButton', command=self.show_about).grid(row=0, column=5, padx=5)
+        self.settings_button = ttk.Button(button_frame, text="Settings", style='Settings.TButton', 
+                  command=self.toggle_settings)
+        self.settings_button.grid(row=0, column=1, padx=5)
         
-        # Pop-up windows
-        self.settings_popup = None
-        self.apps_popup = None
+        self.apps_button = ttk.Button(button_frame, text="Apps", style='Apps.TButton', 
+                  command=self.toggle_apps)
+        self.apps_button.grid(row=0, column=2, padx=5)
+        
+        self.filem_button = ttk.Button(button_frame, text="File M", style='FileM.TButton', 
+                  command=self.open_file_explorer)
+        self.filem_button.grid(row=0, column=3, padx=5)
+        
+        self.download_button = ttk.Button(button_frame, text="Downloads", style='Download.TButton', 
+                  command=self.open_downloads)
+        self.download_button.grid(row=0, column=4, padx=5)
+        
+        ttk.Button(button_frame, text="About", style='About.TButton', 
+                  command=self.show_about).grid(row=0, column=5, padx=5)
+        
+        self.root.bind('<Control-v>', lambda e: self.toggle_voice())
+        self.root.bind('<Control-s>', lambda e: self.toggle_settings())
+        self.root.bind('<Control-a>', lambda e: self.toggle_apps())
+        self.root.bind('<Control-m>', lambda e: self.open_file_explorer())
+        self.root.bind('<Control-d>', lambda e: self.open_downloads())
+        
+        self.status_label = ttk.Label(self.root, text="Internet: Checking...", 
+                                     style='TLabel')
+        self.status_label.pack(pady=5)
+        self.update_internet_status()
+
+    def update_internet_status(self):
+        """Update the internet status label periodically."""
+        status = "Online" if self.check_internet() else "Offline"
+        self.status_label.config(text=f"Internet: {status}")
+        self.root.after(10000, self.update_internet_status)
 
     def toggle_voice(self):
-        if not self.microphone:
-            self.speak("Microphone not available. Please check your audio device.")
+        """Toggle voice input on or off."""
+        if self.microphone is None:
+            message = "Voice recognition is disabled due to missing dependencies or hardware. Use text input instead."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
             return
         self.is_listening = not self.is_listening
         if self.is_listening:
-            self.voice_button.configure(style='Voice.TButton')
+            self.voice_button.configure(style='Voice.On.TButton')
+            message = "Microphone is now on"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
             threading.Thread(target=self.listen_voice, daemon=True).start()
         else:
             self.voice_button.configure(style='Voice.Off.TButton')
+            message = "Microphone is now off"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def wish_me(self):
+        """Greet the user based on the time of day with female voice."""
         current_hour = datetime.datetime.now().hour
-        if 5 <= current_hour < 12:
-            self.speak("Good morning")
-        elif 12 <= current_hour < 17:
-            self.speak("Good afternoon")
-        elif 17 <= current_hour < 21:
-            self.speak("Good evening")
-        else:
-            self.speak("Good night")
+        greeting = (
+            "Good morning" if 5 <= current_hour < 12 else
+            "Good afternoon" if 12 <= current_hour < 17 else
+            "Good evening" if 17 <= current_hour < 21 else
+            "Good night"
+        )
+        self.speak_gtts(greeting)
+        self.chat_box_insert(f"Output: {greeting}\n")
+        print(greeting)
+        message = "I am Isha, Intelligent System for Human Assistance. Welcome!"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def listen(self):
-        if not self.microphone:
-            return None
-        with self.microphone as source:
-            self.recognizer.adjust_for_ambient_noise(source)
-            try:
-                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
-                return self.recognizer.recognize_google(audio).lower()
-            except (sr.WaitTimeoutError, sr.UnknownValueError, sr.RequestError):
-                return None
+        """Listen for voice input and return transcribed text, fallback to text input if voice unavailable."""
+        if self.microphone is None:
+            query = simpledialog.askstring("Input", "Voice not available. Enter your command:", parent=self.root)
+            message = "Voice not available. Using text input."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            return query.lower() if query else None
+        
+        try:
+            with self.microphone as source:
+                self.recognizer.adjust_for_ambient_noise(source, duration=1)
+                for _ in range(2):  # Reduced retries to 2
+                    try:
+                        audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=10)
+                        return self.recognizer.recognize_google(audio).lower()
+                    except sr.WaitTimeoutError:
+                        message = "No speech detected, retrying..."
+                        self.speak_gtts(message)
+                        self.chat_box_insert(f"Output: {message}\n")
+                        print(message)
+                        continue
+                    except sr.UnknownValueError:
+                        message = "Could not understand audio, retrying..."
+                        self.speak_gtts(message)
+                        self.chat_box_insert(f"Output: {message}\n")
+                        print(message)
+                        continue
+                    except sr.RequestError as e:
+                        message = f"Speech recognition service error: {str(e)}. Falling back to text input."
+                        self.speak_gtts(message)
+                        self.chat_box_insert(f"Output: {message}\n")
+                        print(message)
+                        query = simpledialog.askstring("Input", "Voice input failed. Enter your command:", parent=self.root)
+                        return query.lower() if query else None
+            message = "Voice input failed after retries. Please use text input."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            query = simpledialog.askstring("Input", "Voice not available. Enter your command:", parent=self.root)
+            return query.lower() if query else None
+        except Exception as e:
+            message = f"Voice input failed: {str(e)}. Please use text input."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            query = simpledialog.askstring("Input", "Voice not available. Enter your command:", parent=self.root)
+            return query.lower() if query else None
 
     def listen_voice(self):
+        """Continuously listen for voice commands while enabled."""
         while self.is_listening:
-            if not self.microphone:
-                self.is_listening = False
-                self.voice_button.configure(style='Voice.Off.TButton')
-                break
-            with self.microphone as source:
-                self.recognizer.adjust_for_ambient_noise(source)
-                try:
-                    audio = self.recognizer.listen(source, timeout=2, phrase_time_limit=5)
-                    command = self.recognizer.recognize_google(audio).lower()
-                    self.root.after(0, self.process_command, command)
-                except (sr.WaitTimeoutError, sr.UnknownValueError, sr.RequestError):
-                    continue
+            command = self.listen()
+            if command:
+                self.root.after(0, self.process_voice_command, command)
+            time.sleep(1)
+
+    def process_voice_command(self, command):
+        """Process voice command by inserting into input_box and simulating enter."""
+        self.input_box.delete(0, tk.END)
+        self.input_box.insert(0, command)
+        event = tk.Event()
+        event.keysym = 'Return'
+        self.process_text_input(event)
+
+    def chat_box_insert(self, text):
+        """Insert text into the chat box and scroll to the end. Speak all messages using gTTS."""
+        self.chat_box.insert(tk.END, text)
+        self.chat_box.see(tk.END)
+        spoken = text.strip()
+        if spoken:  # Only speak non-empty messages
+            self.speak_gtts(spoken)
 
     def process_text_input(self, event):
+        """Process text input from the entry box."""
         command = self.input_box.get().lower().strip()
         if command:
             self.input_box.delete(0, tk.END)
             self.process_command(command)
 
     def process_command(self, command):
-        self.chat_box.insert(tk.END, f"Input: {command}\n")
-        
+        """Process user commands and execute corresponding actions."""
+        logging.info(f"Processing command: {command}, Internet: {self.internet_status}")
+        self.chat_box_insert(f"Input: {command}\n")
+        print(f"Input: {command}")
         command = command.lower().strip()
-        if command in ["what is the time", "samaye kya ho raha hai"]:
+
+        if command in ["what is the time", "samaye kya ho raha hai", "time"]:
             self.get_time()
-        elif command in ["what is the date", "aaj date kya hai"]:
+        elif command in ["what is the date", "aaj date kya hai", "date"]:
             self.get_date()
-        elif command.startswith("solve "):
-            self.solve_math(command[6:])
-        elif command == "about all setting":
-            self.show_all_settings_popup()
-        elif command in ["open file m", "open file explorer"]:
+        elif command.startswith("solve ") or re.match(r"^\d+\s*[\+\-\*/]\s*\d+", command):
+            expression = command[6:] if command.startswith("solve ") else command
+            self.solve_math(expression)
+        elif command in ["open calculator", "calculator", "isha open calculator", "isha"]:
+            self.open_calculator()
+        elif command in ["open file m", "open file explorer", "open file manager", "isha open file manager", "file manager", "isha open file explorer", "file explorer"]:
             self.open_file_explorer()
-        elif command == "open download":
+        elif command in ["open download", "isha open download", "isha open download file", "isha open file download", "file download", "isha open file downloader", "open file downloader", "file downloader"]:
             self.open_downloads()
-        elif "isha play song" in command or "isha play music" in command or "play song" in command or "play music" in command: 
-            self.play_song() 
-        elif "youtube" in command or "isha youtube" in command or "manoranjan suri kiya jaaye" in command: 
+        elif command in ["open minimize", "minimize"]:
+            self.minimize_windows()
+        elif command in ["search", "app", "file", "setting"]:
+            self.open_search()
+        elif command in ["news", "show news", "isha show news"]:
+            if self.check_internet():
+                self.open_news_widget()
+            else:
+                message = "News requires internet. Opening local news app instead."
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+                subprocess.run(["start", "msnweather:"], shell=True)
+        elif command in ["open run command", "open run", "isha open run command", "run command"]:
+            self.open_run_command()
+        elif command in ["open setting", "isha open setting", "isha open settings", "open settings"]:
+            self.open_settings()
+        elif command in ["ok isha", ""]:
+            self.find_now()
+        elif command in ["open about setting", "about this pc", "isha open about pc", "isha about pc", "about pc", "isha about this pc", "isha open about this pc", "isha about setting", "isha open about setting"]:
+            self.open_about_settings()
+        elif command in ["open project screen", "show project screen", "isha open project screen", "isha project screen", "isha show me project screen", "isha show me a project screen"]:
+            self.open_project_screen()
+        elif command in ["enhanced security", "isha active enhanced security", "isha open enhanced security"]:
+            self.open_performance_settings()
+        elif command in ["open feedback", "showing feedback", "show feedback", "isha show me feedback", "isha show feedback", "isha showing a feedback", "isha showing feedback", "isha open feedback", "isha feedback", "isha feedbacks", "show me a feedbacks"]:
+            self.open_feedback_hub()
+        elif command in ["open xbox", "game bar", "open game bar", "isha open game bar", "isha open xbox", "xbox"]:
+            self.open_game_bar()
+        elif command in ["open mic", "isha open mic", "mic"]:
+            self.open_voice_typing()
+        elif command in ["connect", "show all connect", "show network", "isha shw me a all connect network", "show all connect network", "isha show network"]:
+            self.open_connect_panel()
+        elif command in ["lock screen", "screen lock kar do", "isha look screen"]:
+            self.lock_screen()
+        elif command in ["show all menu"]:
+            self.open_quick_menu()
+        elif command in ["open cort治安"]:
+            self.open_cortana()
+        elif command in ["open clipboard", "show clipboard", "isha open clipboard", "isha show me clipboard"]:
+            self.open_clipboard_history()
+        elif command in ["duplicate window"]:
+            self.open_notifications()
+        elif "isha play song" in command or "play song" in command or "play music" in command or "isha play music" in command or "isha play the song" in command or "isha play the music" in command:
+            self.play_song()
+        elif "youtube" in command or "isha youtube" in command or "manoranjan suru kiya jaaye" in command or "isha open youtube" in command:
             self.open_youtube()
-        elif "google" in command or "isha open google" in command or "google open now" in command: 
+        elif "google" in command or "isha open google" in command or "google open now" in command or "open google" in command:
             self.open_google()
-        elif "instagram" in command or "isha open instagram" in command or "instagram chalu karo" in command or "gili gili chu" in command or "gili gili chhu" in command or "gili gili suit" in command: 
+        elif "instagram" in command or "isha open instagram" in command or "instagram chalu karo" in command or "gili gili chu" in command or "gili gili chhu" in command or "gili gili suit" in command:
             self.open_instagram()
-        elif "whatsapp" in command or "isha whatsapp" in command: 
+        elif "iti" in command:
+            self.open_25()
+        elif "open phone camera" in command or "isha open phone camera" in command or "phone camera" in command:
+            self.came2()
+        elif "phone camera off" in command or "off camera phone" in command or "isha phone camera off" in command:
+            self.cmaw21()
+        elif "h1" in command.lower() or "open h1" in command or "isha open h1" in command:
+            self.open_chatbox()
+        elif "download photo" in command or "download picture" in command or "isha download photo" in command or "isha download picture" in command or "dd photo" in command or "dd picture" in command:
+            self.download_picture()
+        elif "instagram login" in command or "isha login instagram" in command or "instagram login now" in command:
+            self.login_instagram()
+        elif "whatsapp" in command or "isha whatsapp" in command or "isha open whatsapp" in command or "open whatsapp" in command:
             self.open_whatsapp()
-        elif "hello" in command or "hello isha" in command or "hi" in command or "hi isha" in command: 
+        elif "hello" in command or "hello isha" in command or "hi" in command or "hi isha" in command:
             self.hello()
-        elif "thank you isha" in command or "thank you" in command or "thanks isha" in command: 
+        elif "thank you isha" in command or "thank you" in command or "thanks isha" in command:
             self.thank_you_reply()
-        elif "what you mane" in command:
+        elif "what you mane" in command or "what is your name" in command:
             self.what_is_your_name()
+        elif "select all text" in command or "select all" in command or "isha select all text" in command or "isha select all" in command:
+            self.select_all_text()
+        elif "good morning" in command or "morning" in command or "good morning isha" in command or "isha good morning" in command:
+            self.morningtime()
         elif "stop song" in command or "stop" in command or "stop music" in command or "isha song band karo" in command:
             self.stop_song()
+        elif "download reel" in command or "download storie" in command or "download instagram reel" in command or "instagram reel download" in command or "isha download instagram reel" in command or "download instagram stories" in command or "download instagram storie" in command or "isha downloas instagram storie" in command or "isha instagram storie download" in command or "isha instagram stories download" in command or "ist reel" in command:
+            self.download_instagram_reel()
         elif "mute" in command or "song mute" in command or "isha song mute" in command or "awaaz band karo" in command or "isha song unmute karo" in command or "unmute song" in command or "unmute" in command:
             self.mute_unmute()
-        elif "full screen" in command or "screen full karo" in command: 
+        elif "full screen" in command or "screen full karo" in command or "isha full screen" in command:
             self.full_screen()
-        elif "caption chalu karo" in command or "caption" in command or "caption band karo" in command or "isha caption band karo" in command: 
+        elif "caption chalu karo" in command or "caption" in command or "caption band karo" in command or "isha caption band karo" in command or "isha on caption" in command:
             self.toggle_caption()
-        elif "weather" in command or "isha what is weather" in command or "aaj ka mausam kya hai" in command: 
+        elif "weather" in command or "isha what is weather" in command or "aaj ka mausam kya hai" in command or "isha weather" in command or "what is weather" in command:
             self.get_weather()
-        elif "shutdown" in command or "isha shutdown now" in command or "shutdown now" in command or "good night" in command or "isha good night" in command: 
+        elif "shutdown" in command or "isha shutdown now" in command or "shutdown now" in command or "shutdown pc" in command or "isha shutdown pc" in command or "pc shutdown" in command or "isha pc shutdown" in command:
             self.shutdown_pc()
-        elif "restart" in command or "isha pc restart now" in command or "restart now" in command: 
+        elif "restart" in command or "isha pc restart now" in command or "restart now" in command or "isha restart the pc" in command or "restart pc" in command or "isha restart pc" in command:
             self.restart_pc()
         elif "find now" in command or "give me a answer" in command or "isha find now" in command or "search" in command or "search now" in command or "isha search now" in command:
             self.find_now()
@@ -291,301 +617,1017 @@ class IshaAssistant:
             self.wish_me()
         else:
             self.handle_settings_apps_commands(command)
-        
-        self.chat_box.see(tk.END)
 
     def get_time(self):
-        current_time = datetime.datetime.now().strftime("%H:%M:%S")
-        self.speak(f"The current time is {current_time}")
-        self.chat_box.insert(tk.END, f"Output: The current time is {current_time}\n")
+        """Display the current time."""
+        try:
+            current_time = datetime.datetime.now().strftime("%I:%M %p")
+            message = f"The current time is {current_time}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Error retrieving time: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def get_date(self):
-        current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-        self.speak(f"Today's date is {current_date}")
-        self.chat_box.insert(tk.END, f"Output: Today's date is {current_date}\n")
+        """Display the current date."""
+        try:
+            current_date = datetime.datetime.now().strftime("%B %d, %Y")
+            message = f"Today's date is {current_date}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Error retrieving date: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def find_now(self):
+        """Search for a query on Google or open file explorer offline."""
+        if self.check_internet():
+            message = "Tell me what to search"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            search_query = self.listen()
+            if search_query and search_query not in ["none", "cancel", "no"]:
+                webbrowser.open(f"https://www.google.com/search?q={search_query}")
+                message = f"Searching for {search_query} on Google"
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+            else:
+                message = "No search query provided"
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+        else:
+            message = "No internet connection. Opening local file explorer."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            subprocess.run(["explorer"], shell=True)
+
+    def came2(self):
+        """Open phone camera stream with user-configurable URL."""
+        try:
+            url = simpledialog.askstring("Input", "Enter phone camera URL (e.g., http://192.168.43.1:8080/shot.jpg):", parent=self.root)
+            if not url:
+                message = "No URL provided. Cancelling phone camera."
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+                return
+            while True:
+                img_arr = np.array(bytearray(urllib.request.urlopen(url).read()), dtype=np.uint8)
+                img = cv2.imdecode(img_arr, -1)
+                cv2.imshow('IPWebcam', img)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            cv2.destroyAllWindows()
+            message = "Phone camera opened"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open phone camera: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def solve_math(self, expression):
+        """Solve a mathematical expression using sympy."""
         try:
+            expression = expression.strip().replace(" ", "")
             expr = sympify(expression, locals={"sin": sin, "cos": cos, "tan": tan, "sqrt": sqrt, "pi": pi})
             result = expr.evalf()
-            self.speak(f"The result is {result}")
-            self.chat_box.insert(tk.END, f"Output: The result is {result}\n")
+            message = f"The result is {result}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
         except Exception as e:
-            self.speak("Sorry, I couldn't solve that math problem")
-            self.chat_box.insert(tk.END, f"Output: Sorry, I couldn't solve that math problem\n")
+            message = f"Sorry, I couldn't solve that math problem: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_calculator(self):
+        """Open the Windows Calculator app."""
+        try:
+            subprocess.run(["start", "calc"], shell=True, check=True)
+            message = "Opening Calculator"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except subprocess.CalledProcessError as e:
+            message = f"Failed to open Calculator: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def minimize_windows(self):
+        """Minimize all windows using Win+M."""
+        try:
+            pyautogui.hotkey('win', 'm')
+            message = "Minimizing all windows"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to minimize windows: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_search(self):
+        """Open Windows search using Win+Q."""
+        try:
+            pyautogui.hotkey('win', 'q')
+            message = "Opening search"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open search: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_news_widget(self):
+        """Open the Windows news widget using Win+W."""
+        try:
+            pyautogui.hotkey('win', 'w')
+            message = "Opening news widget"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open news widget: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_run_command(self):
+        """Open the Run command dialog using Win+R."""
+        try:
+            pyautogui.hotkey('win', 'r')
+            message = "Opening run command"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open run command: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_settings(self):
+        """Open Windows settings using Win+I."""
+        try:
+            pyautogui.hotkey('win', 'i')
+            message = "Opening settings"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open settings: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_about_settings(self):
+        """Open About settings using ms-settings:about."""
+        try:
+            subprocess.run(["start", "ms-settings:about"], shell=True, check=True)
+            message = "Opening about settings"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except subprocess.CalledProcessError as e:
+            message = f"Failed to open about settings: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_project_screen(self):
+        """Open project screen settings using Win+P."""
+        try:
+            pyautogui.hotkey('win', 'p')
+            message = "Opening project screen"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open project screen: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_performance_settings(self):
+        """Open performance settings using Win+S."""
+        try:
+            pyautogui.hotkey('win', 's')
+            message = "Opening performance settings"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open performance settings: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_feedback_hub(self):
+        """Open Feedback Hub using Win+F."""
+        try:
+            pyautogui.hotkey('win', 'f')
+            message = "Opening feedback hub"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open feedback hub: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_game_bar(self):
+        """Open Game Bar using Win+G."""
+        try:
+            pyautogui.hotkey('win', 'g')
+            message = "Opening game bar"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open game bar: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_25(self):
+        """Open ITI admission website."""
+        try:
+            webbrowser.open("https://itiadmission.gujarat.gov.in/")
+            message = "Opening ITI admission website"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open ITI website: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_google(self):
+        """Open Google website."""
+        try:
+            webbrowser.open("https://www.google.com/")
+            message = "Opening Google"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open Google: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_youtube(self):
+        """Open YouTube website."""
+        try:
+            webbrowser.open("https://youtube.com/")
+            message = "Opening YouTube"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open YouTube: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_instagram(self):
+        """Open Instagram website."""
+        try:
+            webbrowser.open("https://www.instagram.com/")
+            message = "Opening Instagram"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open Instagram: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_voice_typing(self):
+        """Open voice typing using Win+H."""
+        try:
+            pyautogui.hotkey('win', 'h')
+            message = "Opening voice typing"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open voice typing: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_connect_panel(self):
+        """Open connect panel using Win+K."""
+        try:
+            pyautogui.hotkey('win', 'k')
+            message = "Opening connect panel"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open connect panel: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def lock_screen(self):
+        """Lock the screen using Win+L."""
+        try:
+            pyautogui.hotkey('win', 'l')
+            message = "Locking screen"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to lock screen: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_quick_menu(self):
+        """Open quick menu using Win+X."""
+        try:
+            pyautogui.hotkey('win', 'x')
+            message = "Opening quick menu"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open quick menu: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_cortana(self):
+        """Open Cortana using Win+C."""
+        try:
+            pyautogui.hotkey('win', 'c')
+            message = "Opening Cortana"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open Cortana: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_clipboard_history(self):
+        """Open clipboard history using Win+V."""
+        try:
+            pyautogui.hotkey('win', 'v')
+            message = "Opening clipboard history"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open clipboard history: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def open_notifications(self):
+        """Open notifications using Win+N."""
+        try:
+            pyautogui.hotkey('win', 'n')
+            message = "Opening notifications"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open notifications: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def select_all_text(self):
+        """Select all text using Ctrl+A."""
+        try:
+            pyautogui.hotkey('ctrl', 'a')
+            message = "Selecting all text"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to select all text: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def toggle_settings(self):
-        if self.settings_popup and self.settings_popup.winfo_exists():
+        """Toggle the settings popup window."""
+        if hasattr(self, 'settings_popup') and self.settings_popup and self.settings_popup.winfo_exists():
             self.settings_popup.destroy()
             self.settings_popup = None
+            message = "Closing settings popup"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
         else:
             self.show_settings_popup()
 
     def show_settings_popup(self):
-        if self.settings_popup and self.settings_popup.winfo_exists():
-            return
-        
+        """Show a popup with available settings."""
         self.settings_popup = tk.Toplevel(self.root)
         self.settings_popup.title("Settings")
-        listbox = tk.Listbox(self.settings_popup, width=50, height=20)
-        for setting in self.settings_list:
-            listbox.insert(tk.END, setting)
-        listbox.pack(pady=10)
+        self.settings_popup.configure(bg="#1e1e1e")
+        listbox = tk.Listbox(self.settings_popup, width=50, height=20, 
+                            bg="#2d2d2d", fg="#ffffff", 
+                            font=('Arial', 10), bd=0, highlightthickness=0)
+        for display in sorted(self.settings_display_to_cmd.keys()):
+            listbox.insert(tk.END, display)
+        listbox.pack(pady=10, padx=10)
+        listbox.bind('<Double-Button-1>', self.on_settings_select)
+        message = "Opening settings popup"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
+
+    def on_settings_select(self, event):
+        listbox = event.widget
+        sel = listbox.curselection()
+        if sel:
+            display = listbox.get(sel[0])
+            cmd = self.settings_display_to_cmd.get(display)
+            if cmd:
+                try:
+                    if cmd.startswith("http"):
+                        webbrowser.open(cmd)
+                    else:
+                        subprocess.run(["start", cmd], shell=True, check=True)
+                    message = f"Opening {display.split(' (')[0]}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
+                except subprocess.CalledProcessError as e:
+                    message = f"Failed to open {display}: {str(e)}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
 
     def toggle_apps(self):
-        if self.apps_popup and self.apps_popup.winfo_exists():
+        """Toggle the apps popup window."""
+        if hasattr(self, 'apps_popup') and self.apps_popup and self.apps_popup.winfo_exists():
             self.apps_popup.destroy()
             self.apps_popup = None
+            message = "Closing apps popup"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
         else:
             self.show_apps_popup()
 
     def show_apps_popup(self):
-        if self.apps_popup and self.apps_popup.winfo_exists():
-            return
-        
+        """Show a popup with available apps."""
         self.apps_popup = tk.Toplevel(self.root)
         self.apps_popup.title("Apps")
-        listbox = tk.Listbox(self.apps_popup, width=50, height=20)
-        for app in self.apps_list:
-            listbox.insert(tk.END, app)
-        listbox.pack(pady=10)
+        self.apps_popup.configure(bg="#1e1e1e")
+        listbox = tk.Listbox(self.apps_popup, width=50, height=20, 
+                            bg="#2d2d2d", fg="#ffffff", 
+                            font=('Arial', 10), bd=0, highlightthickness=0)
+        for display in sorted(self.apps_display_to_cmd.keys()):
+            listbox.insert(tk.END, display)
+        listbox.pack(pady=10, padx=10)
+        listbox.bind('<Double-Button-1>', self.on_apps_select)
+        message = "Opening apps popup"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
+
+    def on_apps_select(self, event):
+        listbox = event.widget
+        sel = listbox.curselection()
+        if sel:
+            display = listbox.get(sel[0])
+            cmd = self.apps_display_to_cmd.get(display)
+            if cmd:
+                try:
+                    if cmd.startswith("http"):
+                        webbrowser.open(cmd)
+                    else:
+                        subprocess.run(["start", cmd], shell=True, check=True)
+                    message = f"Opening {display}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
+                except subprocess.CalledProcessError as e:
+                    message = f"Failed to open {display}: {str(e)}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
 
     def open_file_explorer(self):
+        """Open File Explorer."""
         try:
-            subprocess.run(["explorer"], shell=True)
-            self.speak("Opening File Explorer")
-            self.chat_box.insert(tk.END, "Output: Opening File Explorer\n")
-        except Exception as e:
-            self.speak("Failed to open File Explorer")
-            self.chat_box.insert(tk.END, f"Output: Failed to open File Explorer: {str(e)}\n")
+            subprocess.run(["explorer"], shell=True, check=True)
+            message = "Opening File Explorer"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except subprocess.CalledProcessError as e:
+            message = f"Failed to open File Explorer: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def open_downloads(self):
+        """Open the Downloads folder."""
         try:
             downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
-            subprocess.run(["explorer", downloads_path], shell=True)
-            self.speak("Opening Downloads folder")
-            self.chat_box.insert(tk.END, "Output: Opening Downloads folder\n")
-        except Exception as e:
-            self.speak("Failed to open Downloads folder")
-            self.chat_box.insert(tk.END, f"Output: Failed to open Downloads folder: {str(e)}\n")
+            subprocess.run(["explorer", downloads_path], shell=True, check=True)
+            message = "Opening Downloads folder"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except subprocess.CalledProcessError as e:
+            message = f"Failed to open Downloads folder: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def show_all_settings_popup(self):
+        """Show a popup with all Windows settings."""
         popup = tk.Toplevel(self.root)
         popup.title("Windows Settings List")
         popup.geometry("500x600")
-        popup.configure(bg="white")
-
-        label = tk.Label(popup, text="Settings List", font=("Arial", 14, "bold"), bg="white")
+        popup.configure(bg="#1e1e1e")
+        label = tk.Label(popup, text="Settings List", font=("Arial", 14, "bold"), 
+                        bg="#1e1e1e", fg="#ffffff")
         label.pack(pady=10)
-
         setting_text = ""
-        for name, (_, code) in self.SETTING_MAP.items():
-            setting_text += f"{name.title()} ({code})\n"
-
-        text_area = scrolledtext.ScrolledText(popup, wrap=tk.WORD, width=60, height=30, font=("Arial", 10), bg="#f0f0f0")
+        for name, cmd in self.SETTING_MAP.items():
+            setting_text += f"{name.title()} ({cmd[1]})\n"
+        text_area = scrolledtext.ScrolledText(popup, wrap=tk.WORD, width=60, height=30, 
+                                            font=("Arial", 10), bg="#2d2d2d", 
+                                            fg="#ffffff", insertbackground="#ffffff", 
+                                            bd=0, relief='flat')
         text_area.insert(tk.END, setting_text)
         text_area.configure(state='disabled')
-        text_area.pack(pady=10)
+        text_area.pack(pady=10, padx=10)
+        message = "Showing all settings"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def show_about(self):
+        """Show information about the assistant."""
         about_popup = tk.Toplevel(self.root)
         about_popup.title("About")
-        tk.Label(about_popup, text="Hello friends").pack(pady=10)
-        self.speak("Hello friends")
-        self.chat_box.insert(tk.END, "Output: Hello friends\n")
+        about_popup.configure(bg="#1e1e1e")
+        tk.Label(about_popup, text="Isha Assistant, which stands for Intelligent System for Human Assistance, is a smart tool that helps you do things on your Windows computer.\nIt is built using Python and can understand both voice and text commands.\nYou can talk to it using a microphone or type commands in a simple window.\nIt uses speech recognition, text-to-speech, and web tools to do many tasks, like opening apps or finding information.\nThis document explains what Isha Assistant can do and how it makes computer work easier for everyone.", 
+                 font=("Arial", 12), bg="#1e1e1e", fg="#ffffff").pack(pady=10)
+        message = "Isha Assistant, your personal desktop assistant"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def handle_settings_apps_commands(self, command):
-        for software, cmd in self.software_dict.items():
-            if command in [f"open {software.lower()}", f"open {software.lower().replace(' ', '')}"]:
+        """Handle commands to open settings or apps."""
+        for name, cmd in self.commands_dict.items():
+            if command in [f"open {name.lower()}", f"open {name.lower().replace(' ', '')}", name.lower()]:
                 try:
-                    subprocess.run(cmd, shell=True)
-                    self.speak(f"Opening {software}")
-                    self.chat_box.insert(tk.END, f"Output: Opening {software}\n")
-                except Exception as e:
-                    self.speak(f"Failed to open {software}")
-                    self.chat_box.insert(tk.END, f"Output: Failed to open {software}: {str(e)}\n")
-                return
-
-        for setting, (uri, code) in self.SETTING_MAP.items():
-            if command in [f"open {setting.lower()}", f"open {code}"]:
-                try:
-                    subprocess.run(["start", "", uri], shell=True)
-                    self.speak(f"Opening {setting}")
-                    self.chat_box.insert(tk.END, f"Output: Opening {setting}\n")
-                except Exception as e:
-                    self.speak(f"Failed to open {setting}")
-                    self.chat_box.insert(tk.END, f"Output: Failed to open {setting}: {str(e)}\n")
-                return
-
-        for app, uri in self.apps_commands.items():
-            if command in [f"open {app.lower()}", f"open {app.lower().replace(' ', '')}"]:
-                try:
-                    subprocess.run(["start", "", uri], shell=True)
-                    self.speak(f"Opening {app}")
-                    self.chat_box.insert(tk.END, f"Output: Opening {app}\n")
-                except Exception as e:
-                    self.speak(f"Failed to open {app}")
-                    self.chat_box.insert(tk.END, f"Output: Failed to open {app}: {str(e)}\n")
-                return
-
-        self.speak("Sorry, I didn't understand that command")
-        self.chat_box.insert(tk.END, "Output: Sorry, I didn't understand that command\n")
-
-    def speak(self, text):
-        def run_speak():
-            try:
-                self.engine.say(text)
-                self.engine.runAndWait()
-            except RuntimeError:
-                pass
-        threading.Thread(target=run_speak, daemon=True).start()
+                    if cmd.startswith("http"):
+                        webbrowser.open(cmd)
+                    elif cmd.startswith("ms-"):
+                        subprocess.run(["start", "", cmd], shell=True, check=True)
+                    else:
+                        subprocess.run(["start", "", cmd], shell=True, check=True)
+                    message = f"Opening {name}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
+                    return
+                except subprocess.CalledProcessError as e:
+                    message = f"Failed to open {name}: {str(e)}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
+                    return
+        message = f"Command not recognized: {command}"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def play_song(self):
-        playlist_links = [
-            "https://youtu.be/s4KzN7mW8T8?si=-xB_gzSjGfpDSmZM",
-            "https://youtu.be/MGwiCtsbB6k?si=5_xcM__lAOJMFc9n",
-            "https://youtu.be/uFbayWnLGxs?si=mX5geBfOevjY1vso",
-            "https://youtu.be/aHuuaIAS_U4?si=F-IaqgPpJyHVnFoA",
-            "https://youtu.be/TkAiQJzctFY?si=a4949Ki95Hu_pE36"
-        ]
-        url = random.choice(playlist_links)
-        webbrowser.open(url)
-        time.sleep(2)
-        pyautogui.press("k") 
-        self.speak("Playing a song")
-        self.chat_box.insert(tk.END, "Output: Playing a song\n")
+        """Play a song from YouTube or a local file."""
+        if self.check_internet():
+            playlist_links = [
+                "https://youtu.be/bzSTpdcs-EI?si=TPrjRhE4pRVjO0Hh",
+                "https://youtu.be/j9GxZ6MtJSU?si=jQM2uGAnbxt356MO",
+                "https://youtu.be/AbkEmIgJMcU?si=nCsq6FjQCoE9mfMH",
+                "https://youtu.be/tNc2coVC2aw?si=XHFQpaQnOD0fOzOc",
+                "https://youtu.be/xPfzx5F-8aw?si=GvwUrqZY7nclNN2M",
+                "https://youtu.be/JgDNFQ2RaLQ?si=RJaFIARD3TmmryIp",
+                "https://youtu.be/jdqUfW21vAY?si=tbqSj28ZVzxulVEN",
+                "https://youtu.be/ax6OrbgS8lI?si=Qu8ATX1PYByTcTam",
+                "https://youtu.be/UyoDdroSXXs?si=BENWSEo5AP5dAP7j",
+                "https://youtu.be/NW6Dgax2d6I?si=KKqQLtl4g6_dNYCw",
+                "https://youtu.be/YUyze3hvKFo?si=4ABKHN-2aqly9eIF",
+                "https://youtu.be/n2dVFdqMYGA?si=sE1OQqLurU7LkUHH",
+                "https://youtu.be/gPpQNzQP6gE?si=Eji_2ze9U5prBQpz",
+                "https://youtu.be/AX6OrbgS8lI?si=l5miVi6KYBdpcxjY",
+                "https://youtu.be/TkAiQJzctFY?si=ftSyKFuCJ0ufYHv4",
+                "https://youtu.be/TkAiQJzctFY?si=JBG-YdzoTZEAsKgV",
+                "https://youtu.be/uFbayWnLGxs?si=–VMABpuHCU2RMP2",
+                "https://youtu.be/9KCtZ9r4OAw?si=e7n28CCQ1bL699uR",
+                "https://youtu.be/uSb0M_UQE1o?si=gk3WGAU7979W_jBd",
+                "https://youtu.be/FudfVyYWNxQ?si=PBCUyE56uU52OsO9"
+            ]
+            url = random.choice(playlist_links)
+            webbrowser.open(url)
+            time.sleep(2)
+            pyautogui.press("k")
+            message = "Playing a song from YouTube"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        else:
+            music_dir = os.path.join(os.path.expanduser("~"), "Music")
+            music_files = glob.glob(os.path.join(music_dir, "*.mp3")) + glob.glob(os.path.join(music_dir, "*.wav"))
+            if music_files:
+                music_file = random.choice(music_files)
+                subprocess.run(["start", "", music_file], shell=True)
+                message = f"Playing local music file: {os.path.basename(music_file)}"
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+            else:
+                message = "No internet connection and no local music files found"
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
 
     def search_web(self, platform, query):
-        if platform == "youtube":
-            webbrowser.open(f"https://www.youtube.com/results?search_query={query}")
-        elif platform == "google":
-            webbrowser.open(f"https://www.google.com/search?q={query}")
+        """Search on YouTube or Google."""
+        try:
+            if platform == "youtube":
+                webbrowser.open(f"https://www.youtube.com/results?search_query={query}")
+                message = f"Searching {query} on YouTube"
+            elif platform == "google":
+                webbrowser.open(f"https://www.google.com/search?q={query}")
+                message = f"Searching {query} on Google"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to search on {platform}: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
-    def open_youtube(self):
-        self.speak("Do you want to search for something?")
-        query = self.listen()
-        if query:
-            self.search_web("youtube", query)
-            self.speak(f"Searching for {query} on YouTube")
-            self.chat_box.insert(tk.END, f"Output: Searching for {query} on YouTube\n")
-        else:
-            webbrowser.open("https://www.youtube.com")
-            self.speak("Opening YouTube")
-            self.chat_box.insert(tk.END, "Output: Opening YouTube\n")
+    def login_instagram(self):
+        """Log into Instagram using Selenium with GUI input."""
+        if not self.check_internet():
+            message = "Instagram requires an internet connection. Opening local Photos app instead."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            subprocess.run(["start", "", "microsoft.photos:"], shell=True)
+            return
 
-    def open_google(self):
-        self.speak("What do you want to search?")
-        query = self.listen()
-        if query:
-            self.search_web("google", query)
-            self.speak(f"Searching for {query} on Google")
-            self.chat_box.insert(tk.END, f"Output: Searching for {query} on Google\n")
-        else:
-            webbrowser.open("https://www.google.com")
-            self.speak("Opening Google")
-            self.chat_box.insert(tk.END, "Output: Opening Google\n")
+        def run_login():
+            try:
+                from selenium import webdriver
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.common.keys import Keys
+                from selenium.webdriver.chrome.service import Service
+                from webdriver_manager.chrome import ChromeDriverManager
+                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+                driver.set_page_load_timeout(30)
+                driver.get("https://www.instagram.com/accounts/login/")
+                message = "Logging into Instagram"
+                self.root.after(0, self.speak_gtts, message)
+                self.root.after(0, self.chat_box_insert, f"Output: {message}\n")
+                self.root.after(0, lambda: print(message))
+                time.sleep(3)
 
-    def open_instagram(self):
-        webbrowser.open("https://www.instagram.com")
-        self.speak("Opening Instagram. Please log in manually.")
-        self.chat_box.insert(tk.END, "Output: Opening Instagram\n")
+                username = simpledialog.askstring("Input", "Enter Instagram username:", parent=self.root)
+                password = simpledialog.askstring("Input", "Enter Instagram password:", parent=self.root, show="*")
+                if not username or not password:
+                    message = "Login cancelled: Username or password not provided"
+                    self.root.after(0, self.speak_gtts, message)
+                    self.root.after(0, self.chat_box_insert, f"Output: {message}\n")
+                    self.root.after(0, lambda: print(message))
+                    driver.quit()
+                    return
+
+                user_input = driver.find_element(By.NAME, "username")
+                pass_input = driver.find_element(By.NAME, "password")
+                user_input.send_keys(username)
+                pass_input.send_keys(password)
+                pass_input.send_keys(Keys.RETURN)
+                time.sleep(5)
+                driver.quit()
+                message = "Logged into Instagram successfully"
+                self.root.after(0, self.speak_gtts, message)
+                self.root.after(0, self.chat_box_insert, f"Output: {message}\n")
+                self.root.after(0, lambda: print(message))
+            except ImportError as e:
+                message = f"Failed to log into Instagram: Selenium or webdriver_manager not installed. Please install them using pip."
+                self.root.after(0, self.speak_gtts, message)
+                self.root.after(0, self.chat_box_insert, f"Output: {message}\n")
+                self.root.after(0, lambda: print(message))
+            except Exception as e:
+                message = f"Failed to log into Instagram: {str(e)}"
+                self.root.after(0, self.speak_gtts, message)
+                self.root.after(0, self.chat_box_insert, f"Output: {message}\n")
+                self.root.after(0, lambda: print(message))
+
+        threading.Thread(target=run_login, daemon=True).start()
+
+    def open_chatbox(self):
+        """Open the hack.chat chatbox."""
+        try:
+            webbrowser.open("https://hack.chat/?Isha")
+            message = "Opening chatbox"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open chatbox: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def download_picture(self):
+        """Open Pixabay for downloading pictures."""
+        try:
+            webbrowser.open("https://pixabay.com/")
+            message = "Opening Pixabay to download pictures"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open Pixabay: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+
+    def download_instagram_reel(self):
+        """Open a website to download Instagram reels."""
+        try:
+            webbrowser.open("https://igram.world/reels-downloader/")
+            message = "Opening Instagram reel downloader"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+        except Exception as e:
+            message = f"Failed to open Instagram reel downloader: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def open_whatsapp(self):
-        self.speak("Sir, whom do you want to message?")
+        """Open WhatsApp and send a message if specified."""
+        if not self.check_internet():
+            message = "WhatsApp requires an internet connection. Opening notepad instead."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            subprocess.run(["start", "", "notepad"], shell=True)
+            return
+
+        message = "Please provide a phone number with country code."
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
         contact = self.listen()
-        if contact:
-            self.speak("What message should I send?")
-            message = self.listen()
-            if message:
+        if contact and re.match(r"^\+\d{10,15}$", contact):
+            message = "What message should I send?"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            message_text = self.listen()
+            if message_text and message_text not in ["none", "cancel", "no"]:
                 try:
-                    pywhatkit.sendwhatmsg_instantly(contact, message)
-                    self.speak(f"Message sent to {contact}")
-                    self.chat_box.insert(tk.END, f"Output: Message sent to {contact}\n")
+                    webbrowser.open("https://web.whatsapp.com")
+                    time.sleep(20)
+                    pywhatkit.sendwhatmsg_instantly(contact, message_text, wait_time=20, tab_close=True)
+                    message = f"Message sent to {contact}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
                 except Exception as e:
-                    self.speak("Failed to send WhatsApp message")
-                    self.chat_box.insert(tk.END, f"Output: Failed to send WhatsApp message: {str(e)}\n")
+                    message = f"Failed to send WhatsApp message: {str(e)}"
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
             else:
-                self.speak("No message provided")
-                self.chat_box.insert(tk.END, "Output: No message provided\n")
+                message = "No message provided"
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
         else:
-            self.speak("No contact provided")
-            self.chat_box.insert(tk.END, "Output: No contact provided\n")
+            message = "Invalid or no contact provided. Please use country code, e.g., +1234567890"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def hello(self):
+        """Respond to a greeting."""
         responses = ["Hi!", "Kaise ho?"]
-        response = random.choice(responses)
-        self.speak(response)
-        self.chat_box.insert(tk.END, f"Output: {response}\n")
+        message = random.choice(responses)
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def thank_you_reply(self):
+        """Respond to a thank you."""
         responses = ["Welcome, I can help you!", "Welcome!"]
-        response = random.choice(responses)
-        self.speak(response)
-        self.chat_box.insert(tk.END, f"Output: {response}\n")
+        message = random.choice(responses)
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def what_is_your_name(self):
+        """Respond with the assistant's name."""
         responses = ["I am Isha", "My name is Isha"]
-        response = random.choice(responses)
-        self.speak(response)
-        self.chat_box.insert(tk.END, f"Output: {response}\n")
+        message = random.choice(responses)
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
+
+    def morningtime(self):
+        """Respond to a morning greeting."""
+        responses = ["Good morning", "Morning there, kaise ho?"]
+        message = random.choice(responses)
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def stop_song(self):
+        """Stop the currently playing song."""
         time.sleep(1)
         pyautogui.press('k')
-        self.speak("Stopping the song")
-        self.chat_box.insert(tk.END, "Output: Stopping the song\n")
+        message = "Stopping the song"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def mute_unmute(self):
+        """Toggle mute/unmute for media."""
         time.sleep(1)
         pyautogui.press('m')
-        self.speak("Toggling mute/unmute")
-        self.chat_box.insert(tk.END, "Output: Toggling mute/unmute\n")
+        message = "Toggling mute/unmute"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def full_screen(self):
+        """Toggle full screen for media."""
         time.sleep(1)
         pyautogui.press('f')
-        self.speak("Toggling full screen")
-        self.chat_box.insert(tk.END, "Output: Toggling full screen\n")
+        message = "Toggling full screen"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
+
+    def cmaw21(self):
+        """Disconnect phone camera."""
+        time.sleep(1)
+        pyautogui.press('q')
+        message = "Phone camera is disconnected"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def toggle_caption(self):
+        """Toggle captions for media."""
         time.sleep(1)
-        pyautogui.press('c')
-        self.speak("Toggling captions")
-        self.chat_box.insert(tk.END, "Output: Toggling captions\n")
+        pyautogui.hotkey('c')
+        message = "Toggling captions"
+        self.speak_gtts(message)
+        self.chat_box_insert(f"Output: {message}\n")
+        print(message)
 
     def shutdown_pc(self):
-        os.system("shutdown /s /t 1")
-        self.speak("Shutting down the PC")
-        self.chat_box.insert(tk.END, "Output: Shutting down the PC\n")
+        """Shut down the PC."""
+        try:
+            message = "Shutting down the PC in 10 seconds. Press Ctrl+C to cancel."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            time.sleep(10)
+            subprocess.run(["shutdown", "/s", "/t", "1"], shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            message = f"Failed to shut down the PC: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def restart_pc(self):
-        os.system("shutdown /r /t 1")
-        self.speak("Restarting the PC")
-        self.chat_box.insert(tk.END, "Output: Restarting the PC\n")
+        """Restart the PC."""
+        try:
+            message = "Restarting the PC in 10 seconds. Press Ctrl+C to cancel."
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            time.sleep(10)
+            subprocess.run(["shutdown", "/r", "/t", "1"], shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            message = f"Failed to restart the PC: {str(e)}"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
 
     def get_weather(self):
-        try:
-            self.speak("Checking weather...")
-            response = requests.get("https://wttr.in/Ahmedabad?format=3")
-            weather_info = response.text
-            self.speak(weather_info)
-            self.chat_box.insert(tk.END, f"Output: {weather_info}\n")
-        except Exception as e:
-            self.speak("Failed to fetch weather information")
-            self.chat_box.insert(tk.END, f"Output: Failed to fetch weather information: {str(e)}\n")
-
-    def find_now(self):
-        self.speak("Tell me what to search")
-        search_query = self.listen()
-        if search_query:
-            self.speak(f"Searching for {search_query} on Google")
-            webbrowser.open(f"https://www.google.com/search?q={search_query}")
-            self.chat_box.insert(tk.END, f"Output: Searching for {search_query} on Google\n")
+        """Fetch weather information for a specified city with improved error handling."""
+        if self.check_internet():
+            message = "Which city's weather do you want to check?"
+            self.speak_gtts(message)
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            city = self.listen()
+            if not city or city.lower() in ["none", "cancel", "no"]:
+                message = "No city provided. Please try again."
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+                return
+            try:
+                response = requests.get(f"https://wttr.in/{city}?format=%C+%t", timeout=5)
+                response.raise_for_status()
+                weather_info = response.text.strip()
+                if not weather_info:
+                    message = f"No weather data available for {city}."
+                    self.speak_gtts(message)
+                    self.chat_box_insert(f"Output: {message}\n")
+                    print(message)
+                    return
+                with open("weather_cache.txt", "w") as f:
+                    f.write(f"{city}:{weather_info}:{int(time.time())}")
+                message = f"Weather in {city}: {weather_info}"
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+            except requests.RequestException as e:
+                message = f"Failed to fetch weather for {city}: {str(e)}. Please check the city name or internet connection."
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
         else:
-            self.speak("No search query provided")
-            self.chat_box.insert(tk.END, "Output: No search query provided\n")
+            try:
+                with open("weather_cache.txt", "r") as f:
+                    cache_data = f.read().strip()
+                    if not cache_data:
+                        message = "No internet connection and no cached weather available."
+                        self.speak_gtts(message)
+                        self.chat_box_insert(f"Output: {message}\n")
+                        print(message)
+                        return
+                    try:
+                        cached_city, weather_info, timestamp = cache_data.split(":", 2)
+                        timestamp = int(timestamp)
+                        if time.time() - timestamp > 3600:
+                            message = "No internet connection and cached weather data is too old."
+                            self.speak_gtts(message)
+                            self.chat_box_insert(f"Output: {message}\n")
+                            print(message)
+                            return
+                        message = f"No internet connection. Using cached weather for {cached_city}: {weather_info}"
+                        self.speak_gtts(message)
+                        self.chat_box_insert(f"Output: {message}\n")
+                        print(message)
+                    except ValueError:
+                        message = "No internet connection and cached weather data is corrupted."
+                        self.speak_gtts(message)
+                        self.chat_box_insert(f"Output: {message}\n")
+                        print(message)
+            except FileNotFoundError:
+                message = "No internet connection and no cached weather file found."
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
+            except Exception as e:
+                message = f"No internet connection and failed to read cached weather: {str(e)}."
+                self.speak_gtts(message)
+                self.chat_box_insert(f"Output: {message}\n")
+                print(message)
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = IshaAssistant(root)
-    root.mainloop()
+    root
