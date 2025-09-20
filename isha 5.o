@@ -32,7 +32,10 @@ class IshaAssistant:
         self.root.title("Isha Assistant")
         self.root.geometry("600x400")
         self.root.configure(bg="#1e1e1e")  # Dark background for root window
+        self.root.resizable(False, False)
+        self.root.attributes('-toolwindow', True)
         
+
         # Initialize text-to-speech
         self.engine = pyttsx3.init()
         self.engine.setProperty('rate', 150)
@@ -382,11 +385,13 @@ class IshaAssistant:
                   command=self.show_about).grid(row=0, column=5, padx=5)
         
         # Shortcut keys
-        self.root.bind('<Control-v>', lambda e: self.toggle_voice())
+        self.root.bind('<Control-m>', lambda e: self.toggle_voice())
         self.root.bind('<Control-s>', lambda e: self.toggle_settings())
         self.root.bind('<Control-a>', lambda e: self.toggle_apps())
-        self.root.bind('<Control-m>', lambda e: self.open_file_explorer())
+        self.root.bind('<Control-f>', lambda e: self.open_file_explorer())
         self.root.bind('<Control-d>', lambda e: self.open_downloads())
+        self.root.bind('<Control-.>', lambda e: self.show_about())
+
         
         # Status label
         self.status_label = ttk.Label(self.root, text="Internet: Checking...", 
