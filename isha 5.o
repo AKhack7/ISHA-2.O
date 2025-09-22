@@ -633,7 +633,7 @@ class IshaAssistant:
             self.shutdown_pc()
         elif "restart" in command or "isha pc restart now" in command or "restart now" in command or "isha restart the pc" in command or "restart pc" in command or "isha restart pc" in command:
             self.restart_pc()
-        elif "find now" in command or "give me a answer" in command or "isha find now" in command or "search" in command or "search now" in command or "isha search now" in command:
+        elif "find now" in command or "give me a answer" in command or "isha find now" in command or "search" in command or "search now" in command or "isha search now" in command or "isha find" in command or "find" in command:
             self.find_now()
         elif command == "about":
             self.show_about()
