@@ -7,6 +7,7 @@ import os
 import webbrowser
 import pyautogui
 import time
+import psutil
 import pywhatkit
 import random
 import subprocess
@@ -76,95 +77,95 @@ class IshaAssistant:
         # Settings and Apps lists
         self.SETTING_MAP = {
             "display setting": ("ms-settings:display", "01"),
-            "sound setting": ("ms-settings:sound", "03"),
-            "notification & action setting": ("ms-settings:notifications", "07"),
-            "focus assist setting": ("ms-settings:quiethours", "08"),
-            "power & sleep setting": ("ms-settings:powersleep", "04"),
-            "storage setting": ("ms-settings:storagesense", "05"),
-            "tablet setting": ("ms-settings:tablet", "03"),
-            "multitasking setting": ("ms-settings:multitasking", "088"),
-            "projecting to this pc setting": ("ms-settings:project", "099"),
-            "shared experiences setting": ("ms-settings:crossdevice", "076"),
-            "system components setting": ("ms-settings:appsfeatures-app", "098"),
-            "clipboard setting": ("ms-settings:clipboard", "054"),
-            "remote desktop setting": ("ms-settings:remotedesktop", "00"),
-            "optional features setting": ("ms-settings:optionalfeatures", "021"),
-            "about setting": ("ms-settings:about", "007"),
-            "system setting": ("ms-settings:system", "0022"),
-            "devices setting": ("ms-settings:devices", "0033"),
-            "mobile devices setting": ("ms-settings:mobile-devices", "0044"),
-            "network & internet setting": ("ms-settings:network", "0055"),
-            "personalization setting": ("ms-settings:personalization", "0066"),
-            "apps setting": ("ms-settings:appsfeatures", "0099"),
-            "account setting": ("ms-settings:yourinfo", "0088"),
-            "time & language setting": ("ms-settings:dateandtime", "0010"),
-            "gaming setting": ("ms-settings:gaming", "0009"),
-            "ease of access setting": ("ms-settings:easeofaccess", "0080"),
-            "privacy setting": ("ms-settings:privacy", "0076"),
-            "updated & security": ("ms-settings:windowsupdate", "0087")
+            "sound setting": ("ms-settings:sound", "02"),
+            "notification & action setting": ("ms-settings:notifications", "03"),
+            "focus assist setting": ("ms-settings:quiethours", "04"),
+            "power & sleep setting": ("ms-settings:powersleep", "05"),
+            "storage setting": ("ms-settings:storagesense", "06"),
+            "tablet setting": ("ms-settings:tablet", "07"),
+            "multitasking setting": ("ms-settings:multitasking", "08"),
+            "projecting to this pc setting": ("ms-settings:project", "09"),
+            "shared experiences setting": ("ms-settings:crossdevice", "010"),
+            "system components setting": ("ms-settings:appsfeatures-app", "001"),
+            "clipboard setting": ("ms-settings:clipboard", "002"),
+            "remote desktop setting": ("ms-settings:remotedesktop", "003"),
+            "optional features setting": ("ms-settings:optionalfeatures", "004"),
+            "about setting": ("ms-settings:about", "005"),
+            "system setting": ("ms-settings:system", "006"),
+            "devices setting": ("ms-settings:devices", "007"),
+            "mobile devices setting": ("ms-settings:mobile-devices", "008"),
+            "network & internet setting": ("ms-settings:network", "009"),
+            "personalization setting": ("ms-settings:personalization", "000"),
+            "apps setting": ("ms-settings:appsfeatures", "10"),
+            "account setting": ("ms-settings:yourinfo", "20"),
+            "time & language setting": ("ms-settings:dateandtime", "30"),
+            "gaming setting": ("ms-settings:gaming", "40"),
+            "ease of access setting": ("ms-settings:easeofaccess", "50"),
+            "privacy setting": ("ms-settings:privacy", "60"),
+            "updated & security": ("ms-settings:windowsupdate", "70")
         }
 
         self.SETTING_MAP4s = {
             "01": ("ms-settings:display"),
-            "03": ("ms-settings:sound"),
-            "07": ("ms-settings:notifications"),
-            "08": ("ms-settings:quiethours"),
-            "04": ("ms-settings:powersleep"),
-            "05": ("ms-settings:storagesense"),
-            "03": ("ms-settings:tablet"),
-            "088": ("ms-settings:multitasking"),
-            "099": ("ms-settings:project"),
-            "076": ("ms-settings:crossdevice"),
-            "098": ("ms-settings:appsfeatures-app"),
-            "054": ("ms-settings:clipboard"),
-            "00": ("ms-settings:remotedesktop"),
-            "021": ("ms-settings:optionalfeatures"),
-            "007": ("ms-settings:about"),
-            "0022": ("ms-settings:system"),
-            "0033": ("ms-settings:devices"),
-            "0044": ("ms-settings:mobile-devices"),
-            "0055": ("ms-settings:network"),
-            "0066": ("ms-settings:personalization"),
-            "0099": ("ms-settings:appsfeatures"),
-            "0088": ("ms-settings:yourinfo"),
-            "0010": ("ms-settings:dateandtime"),
-            "0009": ("ms-settings:gaming"),
-            "0080": ("ms-settings:easeofaccess"),
-            "0076": ("ms-settings:privacy"),
-            "0087": ("ms-settings:windowsupdate")
+            "02": ("ms-settings:sound"),
+            "03": ("ms-settings:notifications"),
+            "04": ("ms-settings:quiethours"),
+            "05": ("ms-settings:powersleep"),
+            "06": ("ms-settings:storagesense"),
+            "07": ("ms-settings:tablet"),
+            "08": ("ms-settings:multitasking"),
+            "09": ("ms-settings:project"),
+            "010": ("ms-settings:crossdevice"),
+            "001": ("ms-settings:appsfeatures-app"),
+            "002": ("ms-settings:clipboard"),
+            "003": ("ms-settings:remotedesktop"),
+            "004": ("ms-settings:optionalfeatures"),
+            "005": ("ms-settings:about"),
+            "006": ("ms-settings:system"),
+            "007": ("ms-settings:devices"),
+            "008": ("ms-settings:mobile-devices"),
+            "009": ("ms-settings:network"),
+            "000": ("ms-settings:personalization"),
+            "10": ("ms-settings:appsfeatures"),
+            "20": ("ms-settings:yourinfo"),
+            "30": ("ms-settings:dateandtime"),
+            "40": ("ms-settings:gaming"),
+            "50": ("ms-settings:easeofaccess"),
+            "60": ("ms-settings:privacy"),
+            "70": ("ms-settings:windowsupdate")
         }
 
         self.apps_commands = {
-            "alarms & clock": "ms-clock:",
-            "calculator": "calc",
-            "calendar": "outlookcal:",
-            "camera": "microsoft.windows.camera:",
-            "copilot": "ms-copilot:",
-            "cortana": "ms-cortana:",
-            "game bar": "ms-gamebar:",
-            "groove music": "mswindowsmusic:",
-            "mail": "outlookmail:",
-            "maps": "bingmaps:",
-            "microsoft edge": "msedge",
-            "microsoft solitaire collection": "ms-solitaire:",
-            "microsoft store": "ms-windows-store:",
-            "mixed reality portal": "ms-mixedreality:",
-            "movies & tv": "mswindowsvideo:",
-            "office": "ms-office:",
-            "onedrive": "ms-onedrive:",
-            "onenote": "ms-onenote:",
-            "outlook": "outlookmail:",
-            "outlook (classic)": "ms-outlook:",
-            "paint": "mspaint",
-            "paint 3d": "ms-paint:",
-            "phone link": "ms-phonelink:",
-            "power point": "ms-powerpoint:",
-            "settings": "ms-settings:",
-            "skype": "skype:",
-            "snip & sketch": "ms-snip:",
-            "sticky note": "ms-stickynotes:",
-            "tips": "ms-tips:",
-            "voice recorder": "ms-soundrecorder:",
+            "alarms & clock": ("ms-clock:","a1"),
+            "calculator": ("calc","c1"),
+            "calendar": ("outlookcal:","c2"),
+            "camera": ("microsoft.windows.camera:","c3"),
+            "copilot": ("ms-copilot:","c4"),
+            "cortana": ("ms-cortana:","c5"),
+            "game bar": ("ms-gamebar:","gb1"),
+            "groove music": ("mswindowsmusic:","gm1"),
+            "mail": ("outlookmail:","m1"),
+            "maps": ("bingmaps:","ms1"),
+            "microsoft edge": ("msedge","me1"),
+            "microsoft solitaire collection": ("ms-solitaire:","mc1"),
+            "microsoft store": ("ms-windows-store:","ms1"),
+            "mixed reality portal": ("ms-mixedreality:","mp1"),
+            "movies & tv": ("mswindowsvideo:","mt1"),
+            "office": ("ms-office:","o1"),
+            "onedrive": ("ms-onedrive:","oe"),
+            "onenote": ("ms-onenote:","oe"),
+            "outlook": ("outlookmail:","ouk"),
+            "outlook (classic)": ("ms-outlook:","oc1"),
+            "paint": ("mspaint","p1"),
+            "paint 3d": ("ms-paint:","p3d"),
+            "phone link": ("ms-phonelink:","pk"),
+            "power point": ("ms-powerpoint:","pt"),
+            "settings": ("ms-settings:","ss"),
+            "skype": ("skype:","sk1"),
+            "snip & sketch": ("ms-snip:","s0h"),
+            "sticky note": ("ms-stickynotes:","s1e"),
+            "tips": ("ms-tips:","ts0"),
+            "voice recorder": ("ms-soundrecorder:","vr0"),
             "weather": "msnweather:",
             "windows backup": "ms-settings:backup",
             "windows security": "ms-settings:windowsdefender",
@@ -1101,6 +1102,23 @@ class IshaAssistant:
             or "turn on music" in command
         ):
             self.mute_unmute()
+
+            
+        elif ("how much power left" in command
+              or "how much power we have" in command 
+              or "battery in query" in command
+              or "isha how much power left" in command
+              or "isha how much power we have" in command 
+              or "isha battery in query" in command
+              or "battery" in command
+              or "isha battery" in command
+              or "isha show battery" in command
+              or "show battery" in command
+            
+            ):
+
+            self.btr()
+            
         elif  (
             "full screen" in command
             or "screen full karo" in command
@@ -1194,7 +1212,7 @@ class IshaAssistant:
             or "isha pc restart karo" in command
         ):
             self.restart_pc()
-        elif "find now" in command or "give me a answer" in command or "isha find now" in command or "search" in command or "search now" in command or "isha search now" in command or "isha find" in command or "find" in command:
+        elif "find now" in command or "give me a answer" in command or "isha find now" in command or "search" in command or "search now" in command or "isha search now" in command or "isha find" in command or "find" in command or "isha search" in command:
             self.find_now()
         elif command == "about":
             self.show_about()
@@ -1284,9 +1302,21 @@ class IshaAssistant:
     def solve_math(self, expression):
         """Solve a mathematical expression using sympy."""
         try:
+            
             expression = expression.strip().replace(" ", "")
+            
+            
             expr = sympify(expression, locals={"sin": sin, "cos": cos, "tan": tan, "sqrt": sqrt, "pi": pi})
             result = expr.evalf()
+            
+            
+            if result.is_integer:
+                result = int(result)  
+            else:
+                
+                result = round(float(result), 6)  
+            
+            
             message = f"The result is {result}"
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
@@ -1781,6 +1811,27 @@ class IshaAssistant:
             self.speak(message)
             self.chat_box_insert(f"Output: {message}\n")
             print(message)
+
+
+
+    def btr(self):
+        """Check the system battery percentage."""
+        try:
+            battery = psutil.sensors_battery()
+            if battery is None:
+                message = "Battery information is not available. This system may not have a battery."
+            else:
+                percentage = battery.percent
+                message = f"System has {percentage}% battery"
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            self.speak(message)
+        except Exception as e:
+            message = f"Error retrieving battery information: {str(e)}"
+            self.chat_box_insert(f"Output: {message}\n")
+            print(message)
+            self.speak(message)
+
 
     def show_all_settings_popup(self):
         """Show a popup with all Windows settings."""
